@@ -1,0 +1,1378 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>¿Quién está leyendo?</title>
+<style>
+:root{
+  --bg:#060a08; --panel:#0c1310; --panel2:#111b16; --line:#1d2e25;
+  --fg:#d7f5e1; --dim:#6d8f7b; --green:#39ff88; --amber:#ffb627; --red:#ff4d6a; --blue:#4fc3f7; --violet:#b388ff;
+  --mono: ui-monospace,"JetBrains Mono","Fira Code","Cascadia Code",Menlo,Consolas,monospace;
+  --aw: clamp(80px, min(10vw, 16vh), 140px);
+}
+*{box-sizing:border-box}
+html,body{margin:0;height:100%;overflow:hidden}
+body{background:var(--bg);color:var(--fg);font-family:var(--mono);-webkit-font-smoothing:antialiased}
+body::before{content:"";position:fixed;inset:0;pointer-events:none;z-index:100;
+  background:repeating-linear-gradient(0deg,rgba(0,0,0,.18) 0 1px,transparent 1px 3px)}
+body::after{content:"";position:fixed;inset:0;pointer-events:none;z-index:99;
+  background:radial-gradient(ellipse at center,transparent 55%,rgba(0,0,0,.6))}
+a{color:inherit}
+
+/* ---------- slides ---------- */
+.slide{position:fixed;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;
+  padding:5vh 5vw 7vh;opacity:0;pointer-events:none;transform:translateY(24px);transition:opacity .45s,transform .45s}
+.slide.active{opacity:1;pointer-events:auto;transform:none}
+.kicker{color:var(--green);font-size:clamp(.8rem,1.2vw,1rem);letter-spacing:.2em;text-transform:uppercase;opacity:.8;margin-bottom:.6em}
+h1{font-size:clamp(2.6rem,7vw,6rem);margin:0;line-height:1.02;text-align:center}
+h2{font-size:clamp(1.6rem,3.4vw,3rem);margin:0 0 .3em;text-align:center;min-height:1.2em}
+.g{color:var(--green)} .a{color:var(--amber)} .r{color:var(--red)} .b{color:var(--blue)} .d{color:var(--dim)} .v{color:var(--violet)}
+.typing::after{content:"▌";color:var(--green);animation:blink 1s steps(1) infinite;margin-left:.05em}
+@keyframes blink{50%{opacity:0}}
+.sub{color:var(--dim);font-size:clamp(1rem,1.8vw,1.4rem);margin-top:1em;letter-spacing:.1em}
+
+.btn{font:inherit;font-size:clamp(.9rem,1.3vw,1.1rem);color:var(--bg);background:var(--green);border:0;border-radius:6px;
+  padding:.6em 1.2em;cursor:pointer;font-weight:700;box-shadow:0 0 18px rgba(57,255,136,.35);transition:transform .15s,opacity .2s}
+.btn:hover{transform:translateY(-2px)} .btn:disabled{opacity:.35;cursor:default;transform:none}
+.btn.ghost{background:transparent;color:var(--green);border:1px solid var(--green);box-shadow:none}
+.btn.red{background:var(--red);box-shadow:0 0 18px rgba(255,77,106,.35)}
+.btn.violet{background:var(--violet);box-shadow:0 0 18px rgba(179,136,255,.4)}
+.controls{display:flex;gap:.8em;justify-content:center;margin-top:1.2em;flex-wrap:wrap;min-height:2.6em}
+
+.chips{display:flex;gap:.7em;flex-wrap:wrap;justify-content:center;margin-top:1.1em;max-width:1100px}
+.chip{border:1px solid var(--line);background:var(--panel);padding:.45em .9em;border-radius:999px;font-size:clamp(.78rem,1.15vw,.98rem);color:var(--dim)}
+.chip b{color:var(--fg);font-weight:600}
+
+/* badge de fuerza bruta: aparece en cada algoritmo */
+.bf{display:inline-flex;align-items:center;gap:.6em;margin-top:1em;border:1px dashed var(--red);color:var(--red);border-radius:6px;
+  padding:.4em .9em;font-size:clamp(.8rem,1.2vw,1rem);opacity:0}
+.bf b{font-weight:800}
+.slide.active .bf{opacity:1;animation:rise .5s 1.4s both}
+
+.slide.active .stagger>*{animation:rise .6s both}
+.slide.active .stagger>*:nth-child(2){animation-delay:.25s}
+.slide.active .stagger>*:nth-child(3){animation-delay:.5s}
+.slide.active .stagger>*:nth-child(4){animation-delay:.75s}
+.slide.active .stagger>*:nth-child(5){animation-delay:1s}
+@keyframes rise{from{opacity:0;transform:translateY(24px)}}
+
+/* ---------- dividers ---------- */
+.divider{display:flex;flex-direction:column;align-items:center}
+.divider .num{font-size:clamp(4rem,14vw,11rem);font-weight:800;color:transparent;-webkit-text-stroke:2px var(--green);line-height:1;opacity:.9}
+.glitch{position:relative;font-size:clamp(2rem,5vw,4.2rem);margin:0}
+.glitch::before,.glitch::after{content:attr(data-text);position:absolute;inset:0;opacity:.8}
+.slide.active .glitch::before{color:var(--red);animation:gl1 1.4s steps(2) 2 both}
+.slide.active .glitch::after{color:var(--blue);animation:gl2 1.4s steps(2) 2 both}
+@keyframes gl1{0%{clip-path:inset(0 0 60% 0);transform:translate(-4px)}50%{clip-path:inset(40% 0 20% 0);transform:translate(4px)}100%{clip-path:inset(0 0 100% 0);transform:none}}
+@keyframes gl2{0%{clip-path:inset(60% 0 0 0);transform:translate(4px)}50%{clip-path:inset(10% 0 60% 0);transform:translate(-4px)}100%{clip-path:inset(100% 0 0 0);transform:none}}
+
+/* ---------- characters / scene ---------- */
+.cast-row{display:flex;gap:clamp(1.5rem,5vw,5rem);margin-top:2.5em;align-items:flex-end}
+.cast-row svg{width:clamp(90px,11vw,160px);height:auto}
+.slide.active .cast-row>*{animation:pop .7s cubic-bezier(.3,1.6,.5,1) both}
+.slide.active .cast-row>*:nth-child(2){animation-delay:.2s}
+.slide.active .cast-row>*:nth-child(3){animation-delay:.9s}
+@keyframes pop{from{opacity:0;transform:translateY(40px) scale(.7)}}
+
+.scene{position:relative;width:min(1000px,92vw);height:calc(var(--aw) * 1.87 + 7em);margin-top:1vh}
+.actor{position:absolute;top:0;width:var(--aw);text-align:center}
+.actor svg.ch{width:100%;height:auto;display:block}
+.actor.alice{left:3%} .actor.bob{right:3%}
+.actor.oscar{left:50%;top:calc(var(--aw) * .62 + 2.2em);transform:translateX(-50%)}
+.name{font-size:clamp(.8rem,1.2vw,1rem);margin-top:.2em}
+.alice .name{color:var(--blue)} .bob .name{color:var(--green)} .oscar .name{color:var(--red)}
+.lvl{display:inline-block;margin-top:.3em;font-size:clamp(.65rem,1vw,.85rem);color:var(--red);border:1px solid rgba(255,77,106,.5);
+  border-radius:4px;padding:.1em .5em;transition:all .3s;white-space:nowrap}
+.lvl.bump{animation:bump .5s}
+@keyframes bump{50%{transform:scale(1.25);background:rgba(255,77,106,.2)}}
+.wire{position:absolute;left:calc(3% + var(--aw));right:calc(3% + var(--aw));top:calc(var(--aw) * .62);height:2px;
+  background:repeating-linear-gradient(90deg,var(--green) 0 10px,transparent 10px 18px);opacity:.6;animation:flow 1s linear infinite}
+@keyframes flow{to{background-position:18px 0}}
+.tap{position:absolute;left:50%;top:calc(var(--aw) * .62);width:10px;height:10px;margin:-4px 0 0 -5px;border-radius:50%;background:var(--red);box-shadow:0 0 12px var(--red)}
+.tapline{position:absolute;left:50%;width:0;border-left:2px dashed rgba(255,77,106,.55);top:calc(var(--aw) * .62);height:2.2em}
+.oscar.sniff svg.ch{filter:drop-shadow(0 0 14px rgba(255,77,106,.8))}
+
+.bubble{position:absolute;bottom:100%;left:50%;transform:translate(-50%,8px) scale(.8);opacity:0;transition:all .3s cubic-bezier(.3,1.5,.5,1);
+  background:var(--panel2);border:1px solid var(--line);padding:.45em .8em;border-radius:8px;white-space:nowrap;font-size:clamp(.8rem,1.3vw,1.05rem);z-index:5;pointer-events:none}
+.bubble.show{opacity:1;transform:translate(-50%,-6px) scale(1)}
+.oscar .bubble{bottom:45%;left:100%;transform:translate(0,0) scale(.8)}
+.oscar .bubble.show{transform:translate(12px,0) scale(1)}
+.bob .bubble{left:auto;right:0;transform:translate(0,8px) scale(.8)}
+.bob .bubble.show{transform:translate(0,-6px) scale(1)}
+.bubble.red{border-color:var(--red);color:var(--red)} .bubble.green{border-color:var(--green);color:var(--green)}
+.bubble.amber{border-color:var(--amber);color:var(--amber)} .bubble.dim{color:var(--dim)}
+
+.tray{position:absolute;top:100%;left:50%;transform:translateX(-50%);margin-top:.6em;display:flex;gap:.6em;align-items:flex-end;justify-content:center;white-space:nowrap}
+
+/* ---------- flyers & items ---------- */
+.flyer{position:fixed;left:0;top:0;z-index:50;pointer-events:none;white-space:nowrap}
+.pkt{display:inline-flex;align-items:center;gap:.4em;padding:.4em .75em;border-radius:6px;background:var(--panel2);border:1px solid var(--amber);
+  color:var(--amber);font-size:clamp(.8rem,1.3vw,1.05rem);box-shadow:0 0 16px rgba(255,182,39,.25)}
+.pkt.cipher{border-color:var(--green);color:var(--green);box-shadow:0 0 16px rgba(57,255,136,.25)}
+.pkt.bad{border-color:var(--red);color:var(--red);box-shadow:0 0 16px rgba(255,77,106,.35)}
+.pkt .pw{color:var(--red);font-weight:700}
+.pkt .hs{color:var(--violet);font-size:.85em}
+.ic{width:1.3em;height:1.3em;vertical-align:middle;flex:none}
+.ic.key{width:2em;height:1em}
+.shake{animation:shake .45s 2}
+@keyframes shake{25%{translate:-6px 0}75%{translate:6px 0}}
+
+.item{display:flex;flex-direction:column;align-items:center;gap:.2em;font-size:clamp(.65rem,1vw,.8rem);color:var(--dim);user-select:none;touch-action:none}
+.item .ic{width:clamp(28px,3vw,40px);height:clamp(28px,3vw,40px)}
+.item .ic.key{width:clamp(44px,4.6vw,62px);height:clamp(22px,2.3vw,31px)}
+.item.pub{color:var(--green)} .item.priv{color:var(--amber)}
+.item.can{cursor:grab;animation:glow 1.2s ease-in-out infinite}
+@keyframes glow{50%{filter:drop-shadow(0 0 10px currentColor)}}
+.dragghost{position:fixed;z-index:60;pointer-events:none;cursor:grabbing;filter:drop-shadow(0 0 12px currentColor)}
+.box{display:flex;align-items:center;gap:.5em;padding:.55em .8em;border:2px solid var(--blue);border-radius:6px;background:var(--panel2);
+  color:var(--blue);font-size:clamp(.8rem,1.3vw,1.05rem);transition:all .3s}
+.box.locked{border-color:var(--green);color:var(--green)}
+.box.target{outline:2px dashed var(--amber);outline-offset:6px}
+.box.open{border-color:var(--green);color:var(--fg);box-shadow:0 0 18px rgba(57,255,136,.4)}
+
+.hint{margin-top:1em;min-height:1.6em;font-size:clamp(.95rem,1.6vw,1.3rem);color:var(--amber);text-align:center}
+.hint.show{animation:rise .4s both}
+
+/* ---------- pasos + leyenda (simétrico / asimétrico) ---------- */
+.legend{display:flex;gap:1.4em;justify-content:center;flex-wrap:wrap;font-size:clamp(.8rem,1.2vw,1rem);color:var(--dim)}
+.legend span{display:inline-flex;align-items:center;gap:.45em}
+.legend b{color:var(--fg);font-weight:600}
+.steps{display:grid;grid-template-columns:repeat(4,1fr);gap:.6em;width:min(1000px,92vw);margin-top:.4em}
+.step{border:1px solid var(--line);background:var(--panel);border-radius:8px;padding:.45em .7em;font-size:clamp(.7rem,1.05vw,.9rem);
+  color:var(--dim);transition:all .3s;line-height:1.35}
+.step b{display:block;font-size:.85em;letter-spacing:.12em}
+.step.on{color:var(--fg);border-color:var(--amber);box-shadow:0 0 14px rgba(255,182,39,.25)} .step.on b{color:var(--amber)}
+.step.done{color:var(--fg);border-color:rgba(57,255,136,.45)} .step.done b{color:var(--green)}
+
+/* ---------- modelo de Paar: A → e → canal inseguro → d → B ---------- */
+.pm{display:grid;grid-template-columns:auto minmax(40px,1fr) auto minmax(120px,2.2fr) auto minmax(40px,1fr) auto;
+  grid-template-rows:auto auto auto;align-items:center;column-gap:.4em;row-gap:.6em;width:min(1100px,94vw);margin-top:1em;
+  font-size:clamp(.8rem,1.3vw,1.1rem)}
+.pm>*{animation:rise .5s both;animation-delay:var(--d,0s)}
+.slide:not(.active) .pm>*{animation:none}
+.pm-actor{position:relative;width:calc(var(--aw) * .85);text-align:center}
+.pm-actor svg.ch{width:100%;height:auto;display:block}
+.pm-arrow{position:relative;height:2px;background:var(--fg);opacity:.7}
+.pm-arrow::after{content:"";position:absolute;right:-2px;top:-5px;border:6px solid transparent;border-left:9px solid var(--fg);border-right:0}
+.pm-arrow span{position:absolute;left:50%;bottom:.5em;transform:translateX(-50%);color:var(--amber);font-weight:700;white-space:nowrap}
+.pm-fn{border:2px solid var(--green);border-radius:8px;background:var(--panel);padding:.5em .9em;text-align:center;min-width:5.5em}
+.pm-fn b{display:block;font-size:1.5em;color:var(--green)}
+.pm-fn small{color:var(--dim)}
+.pm-chan{position:relative;height:2px;background:repeating-linear-gradient(90deg,var(--red) 0 10px,transparent 10px 18px);animation-name:rise}
+.pm-chan>.lbl{position:absolute;left:50%;bottom:.6em;transform:translateX(-50%);color:var(--red);white-space:nowrap;text-align:center}
+.pm-chan>.lbl i{font-style:normal;color:var(--amber);font-weight:700}
+.pm-chan::before{content:"";position:absolute;right:-2px;top:-5px;border:6px solid transparent;border-left:9px solid var(--red);border-right:0}
+.pm-chan .tap{top:0;margin-top:-4px}
+.pm-chan .drop{position:absolute;left:50%;top:0;height:calc(1.2em + .6em);border-left:2px dashed rgba(255,77,106,.55)}
+.pm-key{display:flex;flex-direction:column;align-items:center;color:var(--green);gap:.1em;position:relative}
+.pm-key .ic.key{width:2.4em;height:1.2em}
+.pm-key::after{content:"";width:0;height:1.4em;border-left:2px dashed var(--green);opacity:.6}
+.pm-sec{align-self:start;margin-top:.9em;height:0;border-top:2px dashed rgba(57,255,136,.55);position:relative}
+.pm-sec span{position:absolute;left:50%;top:-1.5em;transform:translateX(-50%);color:var(--green);white-space:nowrap;font-size:.9em}
+.pm-oscar{justify-self:center;margin-top:1.2em}
+.pm .late,.pm-legend .late{visibility:hidden;animation:none}
+.pm.reveal .late,.pm-legend.reveal .late{visibility:visible;animation:rise .5s both;animation-delay:var(--d2,0s)}
+.pm-legend{display:flex;gap:1.2em;flex-wrap:wrap;justify-content:center;margin-top:1.4em;font-size:clamp(.8rem,1.2vw,1rem);color:var(--dim)}
+.pm-legend b{color:var(--amber)}
+.pm-legend .eq{color:var(--fg)}
+@media (max-width:760px){ .pm{font-size:.7rem} .pm-fn{min-width:0;padding:.3em .4em} }
+
+/* ---------- escena inicial ---------- */
+.login{border:1px solid var(--line);background:var(--panel);border-radius:8px;padding:.6em .8em;font-size:clamp(.7rem,1.05vw,.85rem);text-align:left;min-width:12em}
+.login div{display:flex;justify-content:space-between;gap:1em;color:var(--dim)} .login span{color:var(--fg)}
+.stamp{position:absolute;left:50%;top:40%;transform:translate(-50%,-50%) rotate(-8deg) scale(2);opacity:0;z-index:20;
+  border:4px solid var(--red);color:var(--red);padding:.2em .6em;font-size:clamp(1.8rem,4.5vw,3.6rem);font-weight:800;letter-spacing:.05em;
+  background:rgba(6,10,8,.85);pointer-events:none}
+.stamp.show{animation:stamp .4s cubic-bezier(.3,1.4,.6,1) forwards}
+@keyframes stamp{to{opacity:1;transform:translate(-50%,-50%) rotate(-8deg) scale(1)}}
+
+/* ---------- lab links ---------- */
+.links{display:flex;gap:clamp(1rem,3vw,3rem);margin-top:1.4em;flex-wrap:wrap;justify-content:center}
+.link-card{display:block;text-decoration:none;width:clamp(240px,30vw,400px);border:2px solid var(--line);background:var(--panel);border-radius:12px;
+  padding:1.3em 1.4em;transition:transform .2s,box-shadow .2s,border-color .2s}
+.link-card:hover{transform:translateY(-4px)}
+.link-card.http{border-color:rgba(255,77,106,.6)} .link-card.http:hover{box-shadow:0 0 30px rgba(255,77,106,.35)}
+.link-card.https{border-color:rgba(57,255,136,.6)} .link-card.https:hover{box-shadow:0 0 30px rgba(57,255,136,.35)}
+.link-card .proto{font-size:clamp(1.6rem,3.2vw,2.6rem);font-weight:800}
+.link-card .url{color:var(--fg);margin:.3em 0 .8em;font-size:clamp(.85rem,1.3vw,1.1rem);text-decoration:underline;text-underline-offset:4px}
+.link-card .what{color:var(--dim);font-size:clamp(.8rem,1.15vw,.95rem)}
+.lab-steps{margin-top:1.6em;color:var(--dim);font-size:clamp(.8rem,1.15vw,.95rem);text-align:center;line-height:1.8}
+.lab-steps code{color:var(--amber)}
+
+/* ---------- caesar / affine ---------- */
+.caesar{display:flex;gap:clamp(1.5rem,5vw,5rem);align-items:center;margin-top:.6em}
+.wheel{width:clamp(220px,min(28vw,48vh),380px);height:auto}
+.wheel text{font-family:var(--mono);font-size:15px;text-anchor:middle;dominant-baseline:central;transition:fill .2s}
+.wheel .outer text{fill:var(--fg)} .wheel .inner text{fill:var(--green)}
+.wheel text.hl{fill:var(--amber);font-weight:800}
+#inner{transition:transform .8s cubic-bezier(.4,1.4,.5,1)}
+.cz-panel{display:flex;flex-direction:column;gap:1em;min-width:min(420px,40vw)}
+.cz-panel label{color:var(--dim);font-size:clamp(.72rem,1.05vw,.88rem);letter-spacing:.15em;text-transform:uppercase}
+.cz-in{font:inherit;font-size:clamp(1.3rem,2.6vw,2.2rem);background:var(--panel);border:1px solid var(--line);color:var(--amber);padding:.3em .5em;border-radius:6px;width:100%;letter-spacing:.15em;text-transform:uppercase}
+.cz-in:focus{outline:1px solid var(--amber)}
+.cz-shift{display:flex;align-items:center;gap:.8em;font-size:clamp(1.3rem,2.6vw,2.2rem)}
+.cz-shift button{font:inherit;font-size:.8em;width:1.6em;height:1.6em;border-radius:6px;border:1px solid var(--green);background:transparent;color:var(--green);cursor:pointer}
+.cz-shift b{color:var(--green);min-width:1.4em;text-align:center}
+.cz-out{font-size:clamp(1.3rem,2.6vw,2.2rem);letter-spacing:.15em;min-height:1.4em;color:var(--green)}
+.cz-out span{display:inline-block}
+.cz-out span.flip{animation:flip .35s}
+@keyframes flip{50%{transform:rotateX(90deg);color:var(--amber)}}
+
+.formula{font-size:clamp(1.5rem,3.4vw,3rem);margin:.2em 0 .4em;text-align:center}
+.formula .x{color:var(--amber)} .formula .k{color:var(--green)}
+.af-row{display:flex;gap:clamp(1rem,4vw,4rem);align-items:flex-start;flex-wrap:wrap;justify-content:center}
+.af-calc{font-size:clamp(.95rem,1.7vw,1.4rem);min-height:1.5em;color:var(--dim);text-align:center;margin-top:.6em}
+.af-calc b{color:var(--amber)} .af-calc i{color:var(--green);font-style:normal;font-weight:700}
+.alpha{display:grid;grid-template-columns:repeat(26,1fr);gap:2px;width:min(1000px,90vw);margin-top:1em;font-size:clamp(.6rem,1.1vw,1rem);text-align:center}
+.alpha span{padding:.2em 0;border-radius:3px;transition:all .3s}
+.alpha .p{color:var(--fg);background:var(--panel)} .alpha .c{color:var(--green);background:var(--panel2)}
+.alpha span.hl{background:var(--amber);color:var(--bg);font-weight:800}
+
+/* ---------- aritmética modular ---------- */
+.mod-wrap{display:flex;gap:clamp(1.5rem,5vw,5rem);align-items:center;margin-top:.6em}
+.clock{width:clamp(220px,min(28vw,46vh),360px);height:auto}
+.clock text{font-family:var(--mono);text-anchor:middle;dominant-baseline:central;fill:var(--fg);transition:fill .2s}
+.clock text.hl{fill:var(--amber);font-weight:800}
+#mod-hand{transition:transform .3s cubic-bezier(.4,1.5,.5,1)}
+.mod-panel{display:flex;flex-direction:column;gap:.5em;min-width:min(440px,42vw)}
+.mod-eq{font-size:clamp(1.3rem,3vw,2.6rem);min-height:1.3em}
+.mod-res{font-size:clamp(1.3rem,3vw,2.6rem);min-height:1.3em;color:var(--green)}
+.mod-res b{color:var(--amber)}
+.mod-note{color:var(--dim);font-size:clamp(.85rem,1.4vw,1.15rem);min-height:1.3em}
+
+/* ---------- brute ---------- */
+.brute{display:flex;gap:clamp(1.5rem,4vw,4rem);align-items:center;margin-top:1em}
+.oscar-solo{position:relative;width:var(--aw);text-align:center}
+.oscar-solo .bubble{bottom:100%}
+.race{display:flex;flex-direction:column;gap:1.4em;width:min(700px,60vw)}
+.lane .top{display:flex;justify-content:space-between;font-size:clamp(.9rem,1.5vw,1.2rem);margin-bottom:.35em}
+.lane .track{height:14px;border:1px solid var(--line);background:var(--panel);border-radius:7px;overflow:hidden}
+.lane .fill{height:100%;width:0;background:var(--red);box-shadow:0 0 12px var(--red)}
+.lane .try{font-size:clamp(.85rem,1.4vw,1.15rem);margin-top:.35em;color:var(--dim);min-height:1.3em}
+.lane .try.hit{color:var(--green);font-weight:700}
+.big{font-size:clamp(1.2rem,2.6vw,2.2rem);margin-top:.8em;min-height:1.3em;text-align:center}
+
+/* ---------- tabla de tiempos (log) ---------- */
+.bft{width:min(1050px,92vw);margin-top:1.4em;position:relative;font-size:clamp(.78rem,1.25vw,1.05rem)}
+.bft-row{display:grid;grid-template-columns:8.5em 1fr 12em;gap:1em;align-items:center;margin:.5em 0}
+.bft-row .nm b{display:block} .bft-row .nm small{color:var(--dim)}
+.bft-row .bar{height:18px;background:var(--panel);border:1px solid var(--line);border-radius:4px;position:relative}
+.bft-row .fillb{position:absolute;left:0;top:0;bottom:0;width:0;border-radius:3px;transition:width 1.2s cubic-bezier(.3,1,.4,1),background .6s}
+.bft-row .fillb.broken{background:var(--red);box-shadow:0 0 10px rgba(255,77,106,.6)}
+.bft-row .fillb.safe{background:var(--green);box-shadow:0 0 10px rgba(57,255,136,.5)}
+.bft-row .tt{text-align:right;transition:color .4s} .bft-row .tt.broken{color:var(--red)} .bft-row .tt.safe{color:var(--green)}
+.bft-row{opacity:0} .bft.show .bft-row{opacity:1;animation:rise .4s both}
+.bft-mark{position:absolute;top:-1.6em;bottom:0;border-left:2px dashed var(--amber);pointer-events:none;z-index:2}
+.bft-mark span{position:absolute;top:0;left:.4em;white-space:nowrap;color:var(--amber);font-size:.8em}
+.foot{color:var(--dim);font-size:clamp(.65rem,.95vw,.8rem);margin-top:.8em;text-align:center}
+
+/* ---------- enigma ---------- */
+.enigma{display:grid;grid-template-columns:auto auto;gap:clamp(1rem,3vw,3rem);align-items:center;margin-top:.4em}
+.photo{border:1px solid var(--line);border-radius:10px;overflow:hidden;background:#000}
+.photo img{display:block;width:100%;height:100%;object-fit:cover;filter:saturate(.85) contrast(1.05)}
+.photo.main{height:min(58vh,560px);aspect-ratio:3/4}
+.en-side{display:flex;flex-direction:column;gap:.9em;max-width:min(520px,44vw);font-size:clamp(.85rem,1.3vw,1.1rem)}
+.photo.rot{height:min(20vh,190px);aspect-ratio:960/779}
+.count{font-size:clamp(1.1rem,2.2vw,1.9rem);color:var(--amber);font-weight:800;word-break:break-all}
+.en-break{display:flex;gap:1em;align-items:center;opacity:0;transform:translateY(20px);transition:all .6s}
+.en-break.show{opacity:1;transform:none}
+.photo.tur{height:min(20vh,180px);aspect-ratio:675/919;flex:none}
+.photo.tur img{filter:grayscale(1)}
+.photo.bom{height:min(20vh,180px);aspect-ratio:960/1449;flex:none}
+.en-break p{margin:0;font-size:clamp(.8rem,1.2vw,1rem);color:var(--dim);line-height:1.5}
+.en-break p b{color:var(--fg)}
+.credit{position:absolute;bottom:1.2em;left:1.2em;color:var(--dim);font-size:.65rem;opacity:.7;max-width:60vw}
+
+/* ---------- tipos ---------- */
+.types{display:grid;grid-template-columns:1fr 1fr;gap:clamp(1rem,3vw,3rem);width:min(1050px,92vw);margin-top:.6em}
+.tcol{border:1px solid var(--line);background:var(--panel);border-radius:12px;padding:1em 1.3em}
+.tcol h3{margin:0 0 .2em;font-size:clamp(1.2rem,2.2vw,1.8rem)}
+.tcol .meta{color:var(--dim);font-size:clamp(.78rem,1.1vw,.95rem);margin-bottom:.8em;display:flex;gap:.6em;align-items:center}
+.tcol ul{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;gap:.55em}
+.tcol li{display:grid;grid-template-columns:7.5em 1fr auto;gap:.8em;align-items:center;font-size:clamp(.8rem,1.25vw,1.05rem);
+  border-top:1px solid var(--line);padding-top:.5em}
+.tcol li b{color:var(--fg)} .tcol li span{color:var(--dim)}
+.tag{font-size:.8em;padding:.1em .5em;border-radius:4px;border:1px solid;font-style:normal}
+.tag.ok{color:var(--green);border-color:var(--green)} .tag.no{color:var(--red);border-color:var(--red)}
+.slide.active .tcol li{animation:rise .45s both}
+.slide.active .tcol li:nth-child(2){animation-delay:.15s}.slide.active .tcol li:nth-child(3){animation-delay:.3s}.slide.active .tcol li:nth-child(4){animation-delay:.45s}
+.combo{margin-top:1.2em;font-size:clamp(.95rem,1.7vw,1.4rem);text-align:center}
+
+/* ---------- RSA ---------- */
+.rsa{display:flex;gap:clamp(1rem,3vw,3rem);align-items:center;font-size:clamp(1.4rem,3.2vw,2.8rem);margin-top:.6em;flex-wrap:wrap;justify-content:center}
+.pick{display:flex;flex-direction:column;align-items:center;gap:.2em}
+.pick label{font-size:.4em;color:var(--dim);letter-spacing:.15em;text-transform:uppercase}
+.pick .ctl{display:flex;align-items:center;gap:.4em}
+.pick button{font:inherit;font-size:.5em;width:1.7em;height:1.7em;border-radius:6px;border:1px solid var(--amber);background:transparent;color:var(--amber);cursor:pointer}
+.pick b{color:var(--amber);min-width:1.6em;text-align:center}
+.eq{color:var(--dim)}
+.nval{color:var(--green);font-weight:800;min-width:3em;text-align:center}
+.arrows{display:flex;gap:clamp(1rem,4vw,4rem);margin-top:1em;font-size:clamp(.9rem,1.6vw,1.3rem)}
+.arrows div{border:1px solid var(--line);background:var(--panel);border-radius:8px;padding:.6em 1em;text-align:center}
+.fact{font-size:clamp(.9rem,1.6vw,1.3rem);margin-top:1em;min-height:1.5em;text-align:center}
+.bign{width:min(1000px,90vw);margin-top:.8em;font-size:clamp(.55rem,.85vw,.75rem);color:var(--dim);word-break:break-all;line-height:1.35;
+  max-height:5.4em;overflow:hidden;opacity:0;transition:opacity .6s;-webkit-mask-image:linear-gradient(transparent,#000 30%,#000 70%,transparent);mask-image:linear-gradient(transparent,#000 30%,#000 70%,transparent)}
+.bign.show{opacity:1}
+
+/* ---------- hash ---------- */
+.hash-in{font:inherit;font-size:clamp(1.3rem,2.6vw,2.2rem);background:var(--panel);border:1px solid var(--line);color:var(--amber);padding:.3em .5em;border-radius:6px;
+  width:min(640px,86vw);letter-spacing:.1em;text-align:center}
+.hash-in:focus{outline:1px solid var(--amber)}
+.arrow-down{font-size:1.4rem;color:var(--dim);margin:.3em 0}
+.hash-out{display:grid;grid-template-columns:repeat(32,1fr);gap:3px;width:min(1000px,92vw);font-size:clamp(.8rem,1.6vw,1.4rem);text-align:center}
+.hash-out span{background:var(--panel);border-radius:3px;padding:.25em 0;color:var(--violet);transition:background .6s,color .6s}
+.hash-out span.ch{background:var(--amber);color:var(--bg);transition:none}
+.diff{margin-top:.8em;min-height:1.5em;font-size:clamp(.9rem,1.5vw,1.2rem)}
+
+/* ---------- terminal ---------- */
+.term{width:min(1000px,92vw);border:1px solid var(--line);border-radius:10px;background:#040705;overflow:hidden;box-shadow:0 0 40px rgba(57,255,136,.08);margin-top:.6em}
+.term-bar{display:flex;gap:.45em;align-items:center;padding:.55em .8em;background:var(--panel);border-bottom:1px solid var(--line);font-size:.8rem;color:var(--dim)}
+.term-bar i{width:.75em;height:.75em;border-radius:50%;background:var(--line);display:inline-block}
+.term-bar i:nth-child(1){background:#ff5f56}.term-bar i:nth-child(2){background:#ffbd2e}.term-bar i:nth-child(3){background:#27c93f}
+.term-bar span{margin-left:auto}
+.term-body{padding:.8em 1em;font-size:clamp(.6rem,1.02vw,.9rem);line-height:1.45;min-height:clamp(220px,42vh,420px);white-space:pre}
+.term-body .cmd{color:var(--fg);white-space:pre-wrap}
+.term-body .cmd::before{content:"$ ";color:var(--green)}
+.dump-row{display:block;animation:rise .15s both}
+.dump-row .off{color:var(--dim)}
+.dump-row .hx{color:#8fb49d}
+.dump-row .hot{color:var(--red);font-weight:700;text-shadow:0 0 8px rgba(255,77,106,.6)}
+.dump-row .hdr{color:var(--amber);font-weight:700}
+.dump-row .enc{color:var(--green);opacity:.85}
+.verdict{display:block;margin-top:.6em;font-size:1.25em;animation:rise .4s both}
+
+/* ---------- closing ---------- */
+.takeaways{display:flex;flex-direction:column;gap:1.1em;margin-top:1.2em;width:min(950px,90vw)}
+.tk{display:flex;gap:1em;align-items:center;border-left:4px solid var(--green);background:var(--panel);padding:.8em 1.1em;border-radius:0 8px 8px 0;
+  font-size:clamp(1rem,2vw,1.6rem)}
+.tk .n{color:var(--green);font-weight:800;font-size:1.3em}
+.slide.active .takeaways>*{animation:rise .6s both}
+.slide.active .takeaways>*:nth-child(2){animation-delay:.9s}
+.slide.active .takeaways>*:nth-child(3){animation-delay:1.8s}
+.peek{position:absolute;bottom:-20px;right:6vw;width:clamp(100px,12vw,170px)}
+.slide.active .peek{animation:peek 3s ease-in-out 1s infinite}
+@keyframes peek{0%,100%{transform:translateY(70%)}35%,65%{transform:translateY(8%)}}
+
+/* ---------- chrome ---------- */
+.progress{position:fixed;left:0;bottom:0;height:3px;background:var(--green);box-shadow:0 0 10px var(--green);transition:width .4s;z-index:101}
+.nav{position:fixed;right:1.2em;bottom:1em;display:flex;gap:.4em;align-items:center;z-index:101;color:var(--dim);font-size:.8rem}
+.nav button{font:inherit;background:transparent;border:1px solid var(--line);color:var(--dim);border-radius:4px;width:2em;height:2em;cursor:pointer}
+.nav button:hover{color:var(--green);border-color:var(--green)}
+
+@media (max-width:760px){
+  .caesar,.brute,.enigma{flex-direction:column;display:flex}
+  .types{grid-template-columns:1fr}
+  .cz-panel{min-width:0;width:90vw}
+  .race{width:90vw}
+  .en-side{max-width:90vw}
+  .bft-row{grid-template-columns:6em 1fr 7em}
+  .bft-mark{display:none}
+}
+@media (prefers-reduced-motion:reduce){
+  *{animation-duration:.01ms!important;animation-iteration-count:1!important;transition-duration:.01ms!important}
+}
+</style>
+</head>
+<body>
+
+<!-- ============ SVG defs: personajes + iconos ============ -->
+<svg width="0" height="0" style="position:absolute" aria-hidden="true">
+  <defs>
+    <symbol id="c-alice" viewBox="0 0 120 150">
+      <path d="M28 72 Q24 22 60 20 Q96 22 92 72 L97 114 Q60 124 23 114 Z" fill="#17496e"/>
+      <path d="M16 150 Q20 106 60 102 Q100 106 104 150 Z" fill="#4fc3f7"/>
+      <path d="M46 104 L60 122 L74 104" fill="none" stroke="#1b7fae" stroke-width="3.5" stroke-linejoin="round"/>
+      <path d="M51 90 h18 v14 q-9 5 -18 0z" fill="#e2b287"/>
+      <circle cx="60" cy="66" r="27" fill="#f3cfa6"/>
+      <path d="M32 64 Q32 36 60 35 Q89 36 88 66 Q76 48 54 51 Q41 53 32 64Z" fill="#1d5b88"/>
+      <circle cx="50" cy="69" r="3.2" fill="#0b1a24"/><circle cx="70" cy="69" r="3.2" fill="#0b1a24"/>
+      <circle cx="44" cy="78" r="4.5" fill="#f59a8c" opacity=".5"/><circle cx="76" cy="78" r="4.5" fill="#f59a8c" opacity=".5"/>
+      <path d="M52 81 Q60 87 68 81" stroke="#8a4b3a" stroke-width="2.5" fill="none" stroke-linecap="round"/>
+    </symbol>
+    <symbol id="c-bob" viewBox="0 0 120 150">
+      <path d="M16 150 Q20 106 60 102 Q100 106 104 150 Z" fill="#1f4d36"/>
+      <path d="M47 104 L60 130 L73 104 Z" fill="#e9f5ee"/>
+      <path d="M57 108 L63 108 L65.5 130 L60 137 L54.5 130Z" fill="#39ff88"/>
+      <path d="M51 90 h18 v14 q-9 5 -18 0z" fill="#c9926a"/>
+      <circle cx="33" cy="68" r="5" fill="#d9a47c"/><circle cx="87" cy="68" r="5" fill="#d9a47c"/>
+      <circle cx="60" cy="66" r="27" fill="#e7b88f"/>
+      <path d="M33 62 Q31 34 60 33 Q89 34 87 62 Q85 47 73 45 Q61 51 47 45 Q36 48 33 62Z" fill="#3b2a1e"/>
+      <circle cx="50" cy="68" r="3.2" fill="#1a130d"/><circle cx="70" cy="68" r="3.2" fill="#1a130d"/>
+      <path d="M45 61 h9 M66 61 h9" stroke="#3b2a1e" stroke-width="2.5" stroke-linecap="round"/>
+      <path d="M51 80 Q60 88 69 80" stroke="#6d3b26" stroke-width="2.5" fill="none" stroke-linecap="round"/>
+    </symbol>
+    <symbol id="c-oscar" viewBox="0 0 120 150">
+      <path d="M12 150 Q16 104 60 100 Q104 104 108 150Z" fill="#3a1d24"/>
+      <path d="M60 112 V150" stroke="#2a1419" stroke-width="3"/>
+      <circle cx="54" cy="128" r="2.5" fill="#ff4d6a"/><circle cx="54" cy="141" r="2.5" fill="#ff4d6a"/>
+      <path d="M32 110 L44 86 L58 114Z" fill="#552a34"/><path d="M88 110 L76 86 L62 114Z" fill="#552a34"/>
+      <circle cx="60" cy="70" r="25" fill="#d6ab86"/>
+      <path d="M35 76 Q60 104 85 76 Q86 96 60 98 Q34 96 35 76Z" fill="#2b1a14" opacity=".55"/>
+      <path d="M33 48 Q35 17 60 17 Q85 17 87 48Z" fill="#1c1c1c"/>
+      <rect x="34" y="38" width="52" height="7" fill="#ff4d6a"/>
+      <ellipse cx="60" cy="49" rx="44" ry="8" fill="#141414"/>
+      <rect x="39" y="62" width="18" height="10" rx="3" fill="#050505"/><rect x="63" y="62" width="18" height="10" rx="3" fill="#050505"/>
+      <path d="M57 66 h6" stroke="#050505" stroke-width="2.5"/>
+      <path d="M42 64 l6 0" stroke="#ff4d6a" stroke-width="1.5" opacity=".7"/>
+      <path d="M52 84 Q63 88 71 80" stroke="#5a2a20" stroke-width="2.5" fill="none" stroke-linecap="round"/>
+    </symbol>
+    <symbol id="i-key" viewBox="0 0 48 24">
+      <circle cx="10" cy="12" r="7" fill="none" stroke="currentColor" stroke-width="3.2"/>
+      <path d="M17 12 H44 M37 12 v7 M43 12 v5" stroke="currentColor" stroke-width="3.2" fill="none" stroke-linecap="round"/>
+    </symbol>
+    <symbol id="i-lock" viewBox="0 0 32 36">
+      <path d="M9 17 V11 a7 7 0 0 1 14 0 V17" stroke="currentColor" stroke-width="3.5" fill="none"/>
+      <rect x="4" y="16" width="24" height="18" rx="3" fill="currentColor"/>
+      <circle cx="16" cy="25" r="2.6" fill="#060a08"/>
+    </symbol>
+    <symbol id="i-lock-open" viewBox="0 0 32 36">
+      <path d="M23 17 V7 a7 7 0 0 0 -14 0 V10" stroke="currentColor" stroke-width="3.5" fill="none"/>
+      <rect x="4" y="16" width="24" height="18" rx="3" fill="currentColor"/>
+      <circle cx="16" cy="25" r="2.6" fill="#060a08"/>
+    </symbol>
+  </defs>
+</svg>
+
+<!-- ============ Portada ============ -->
+<section class="slide" data-id="title">
+  <div class="kicker">// seguridad de la información</div>
+  <h1>¿Quién está<br><span class="g">leyendo</span>?</h1>
+  <div class="sub">de césar a la computadora cuántica</div>
+  <div class="cast-row">
+    <svg viewBox="0 0 120 150"><use href="#c-alice"/></svg>
+    <svg viewBox="0 0 120 150"><use href="#c-bob"/></svg>
+    <svg viewBox="0 0 120 150"><use href="#c-oscar"/></svg>
+  </div>
+</section>
+
+<!-- ============ 01 · Oscar escucha (P1) ============ -->
+<section class="slide" data-id="div">
+  <div class="divider"><span class="num">01</span><h2 class="glitch" data-text="Oscar escucha">Oscar escucha</h2></div>
+</section>
+
+<section class="slide" data-id="model">
+  <div class="kicker">// 01 · el modelo</div>
+  <h2 data-type>Quién es quién</h2>
+  <div class="pm">
+    <div class="pm-sec late" style="grid-column:3/6;grid-row:1;--d2:.9s"><span>canal seguro</span></div>
+    <div class="pm-key late" style="grid-column:3;grid-row:1;--d2:.6s"><svg class="ic key"><use href="#i-key"/></svg>k</div>
+    <div class="pm-key late" style="grid-column:5;grid-row:1;--d2:.6s"><svg class="ic key"><use href="#i-key"/></svg>k</div>
+
+    <div class="pm-actor alice" style="grid-column:1;grid-row:2;--d:.2s"><div class="bubble"></div><svg class="ch" viewBox="0 0 120 150"><use href="#c-alice"/></svg><div class="name">Alice</div></div>
+    <div class="pm-arrow" style="grid-column:2;grid-row:2;--d:.5s"><span>x</span></div>
+    <div class="pm-fn late" id="pm-e" style="grid-column:3;grid-row:2;--d2:0s"><b>e( )</b><small>cifrar</small></div>
+    <div class="pm-chan" style="grid-column:4;grid-row:2;--d:.8s"><div class="lbl">canal inseguro<i class="late" style="--d2:.3s"> · y</i></div><div class="tap"></div><div class="drop"></div></div>
+    <div class="pm-fn late" id="pm-d" style="grid-column:5;grid-row:2;--d2:.3s"><b>d( )</b><small>descifrar</small></div>
+    <div class="pm-arrow" style="grid-column:6;grid-row:2;--d:1.1s"><span>x</span></div>
+    <div class="pm-actor bob" style="grid-column:7;grid-row:2;--d:1.4s"><div class="bubble"></div><svg class="ch" viewBox="0 0 120 150"><use href="#c-bob"/></svg><div class="name">Bob</div></div>
+
+    <div class="pm-actor oscar pm-oscar" style="grid-column:4;grid-row:3;--d:1.9s"><div class="bubble"></div><svg class="ch" viewBox="0 0 120 150"><use href="#c-oscar"/></svg><div class="name">Oscar</div></div>
+  </div>
+  <div class="pm-legend">
+    <span><b>x</b> = texto plano</span>
+    <span class="late" style="--d2:.3s"><b>y</b> = texto cifrado</span>
+    <span class="late" style="--d2:.6s"><b>k</b> = clave</span>
+    <span class="eq late" style="--d2:.9s">y = e<sub>k</sub>(x) · x = d<sub>k</sub>(y)</span>
+  </div>
+  <div class="controls"><button class="btn" data-act="go"></button></div>
+</section>
+
+<section class="slide" data-id="hook">
+  <div class="kicker">// 01 · el problema</div>
+  <h2 data-type>Alice entra a Bob</h2>
+  <div class="scene">
+    <div class="wire"></div><div class="tapline"></div><div class="tap"></div>
+    <div class="actor alice"><div class="bubble"></div><svg class="ch" viewBox="0 0 120 150"><use href="#c-alice"/></svg><div class="name">Alice</div>
+      <div class="tray"><div class="login"><div>usuario <span>alice</span></div><div>contraseña <span>••••••••</span></div></div></div></div>
+    <div class="actor bob"><div class="bubble"></div><svg class="ch" viewBox="0 0 120 150"><use href="#c-bob"/></svg><div class="name">Bob · banco</div></div>
+    <div class="actor oscar"><div class="bubble"></div><svg class="ch" viewBox="0 0 120 150"><use href="#c-oscar"/></svg><div class="name">Oscar</div><div class="lvl">escucha</div></div>
+    <div class="stamp">OSCAR LA LEYÓ</div>
+  </div>
+  <div class="controls"><button class="btn" data-act="go">▶ Ingresar</button></div>
+</section>
+
+<section class="slide" data-id="lab">
+  <div class="kicker">// 01 · lab · banco bob</div>
+  <h2 data-type>Probalo vos</h2>
+  <div class="links stagger">
+    <a class="link-card http" href="http://127.0.0.1:8000" target="_blank" rel="noopener">
+      <div class="proto r">HTTP</div><div class="url">127.0.0.1:8000</div><div class="what">sin cifrar → Oscar lee la contraseña</div></a>
+    <a class="link-card https" href="https://127.0.0.1:8443" target="_blank" rel="noopener">
+      <div class="proto g">HTTPS</div><div class="url">127.0.0.1:8443</div><div class="what">cifrado → Oscar ve basura</div></a>
+  </div>
+  <div class="lab-steps">
+    <code>python3 server.py</code> · Wireshark en la interfaz <code>lo</code> · usuario <code>alice</code>
+  </div>
+</section>
+
+<section class="slide" data-id="lab-http">
+  <div class="kicker">// 01 · lab · respaldo · puerto 8000</div>
+  <h2 data-type>HTTP: Oscar = Wireshark</h2>
+  <div class="term">
+    <div class="term-bar"><i></i><i></i><i></i><span>oscar@lab — http</span></div>
+    <div class="term-body"><span class="cmd">tshark -i lo -f "tcp port 8000" -Y 'http.request.method == "POST"' -x</span>
+<span class="out"></span></div>
+  </div>
+  <div class="controls"><button class="btn ghost" data-act="go">▶ captura de respaldo</button></div>
+</section>
+
+<section class="slide" data-id="lab-https">
+  <div class="kicker">// 01 · lab · respaldo · puerto 8443</div>
+  <h2 data-type>HTTPS: el mismo login</h2>
+  <div class="term">
+    <div class="term-bar"><i></i><i></i><i></i><span>oscar@lab — https</span></div>
+    <div class="term-body"><span class="cmd">tshark -i lo -f "tcp port 8443" -Y 'tls.app_data &amp;&amp; tcp.dstport == 8443' -x</span>
+<span class="out"></span></div>
+  </div>
+  <div class="controls"><button class="btn ghost" data-act="go">▶ captura de respaldo</button></div>
+</section>
+
+<!-- ============ 02 · Clásicos (P2) ============ -->
+<section class="slide" data-id="div">
+  <div class="divider"><span class="num">02</span><h2 class="glitch" data-text="Clásicos">Clásicos</h2></div>
+</section>
+
+<section class="slide" data-id="caesar">
+  <div class="kicker">// 02 · julio césar · ~50 a.c.</div>
+  <h2 data-type>César: correr cada letra</h2>
+  <div class="caesar">
+    <svg class="wheel" viewBox="-160 -160 320 320">
+      <circle r="152" fill="none" stroke="#1d2e25" stroke-width="2"/>
+      <circle r="118" fill="#0c1310" stroke="#1d2e25" stroke-width="2"/>
+      <circle r="82" fill="none" stroke="#1d2e25" stroke-width="2"/>
+      <g class="outer"></g>
+      <g id="inner" class="inner"></g>
+      <path d="M0 -158 l-8 -10 h16z" fill="#ffb627"/>
+      <text y="0" style="fill:#6d8f7b;font-size:12px">clave</text>
+      <text id="cz-center" y="22" style="fill:#39ff88;font-size:26px;font-weight:800">3</text>
+    </svg>
+    <div class="cz-panel">
+      <div><label>texto plano</label><input class="cz-in" id="cz-in" maxlength="14" value="HOLA BOB" spellcheck="false" autocomplete="off"></div>
+      <div><label>clave</label>
+        <div class="cz-shift"><button data-act="minus">−</button><b id="cz-k">3</b><button data-act="plus">+</button></div></div>
+      <div><label>texto cifrado</label><div class="cz-out" id="cz-out"></div></div>
+    </div>
+  </div>
+  <div class="bf">⏱ fuerza bruta: <b>25 claves</b> → instantáneo</div>
+</section>
+
+<section class="slide" data-id="mod">
+  <div class="kicker">// 02 · aritmética modular</div>
+  <h2 data-type>Mod: la aritmética del reloj</h2>
+  <div class="mod-wrap">
+    <svg class="clock" viewBox="-130 -130 260 260">
+      <circle r="122" fill="#0c1310" stroke="#1d2e25" stroke-width="2"/>
+      <g id="mod-ring"></g>
+      <line id="mod-hand" x1="0" y1="0" x2="0" y2="-72" stroke="#ffb627" stroke-width="6" stroke-linecap="round"/>
+      <circle r="7" fill="#ffb627"/>
+    </svg>
+    <div class="mod-panel">
+      <div class="mod-eq" id="mod-eq"></div>
+      <div class="mod-res" id="mod-res"></div>
+      <div class="mod-note" id="mod-note"></div>
+    </div>
+  </div>
+  <div class="chips">
+    <span class="chip"><b>a mod n</b> → el resto de dividir a por n</span>
+    <span class="chip">al llegar a <b>n</b>, vuelve a <b>0</b></span>
+  </div>
+  <div class="controls">
+    <button class="btn ghost" data-act="clock">▶ 10 + 5 (mod 12)</button>
+    <button class="btn ghost" data-act="abc">▶ X + 3 (mod 26)</button>
+  </div>
+</section>
+
+<section class="slide" data-id="affine">
+  <div class="kicker">// 02 · cifrado afín</div>
+  <h2 data-type>Afín: multiplicar y sumar</h2>
+  <div class="formula">E(<span class="x">x</span>) = (<span class="k" id="af-a">5</span>·<span class="x">x</span> + <span class="k" id="af-b">8</span>) mod 26</div>
+  <div class="af-row">
+    <div class="cz-panel" style="min-width:0">
+      <div><label>a (coprimo con 26)</label><div class="cz-shift"><button data-act="a-">−</button><b id="af-ak">5</b><button data-act="a+">+</button></div></div>
+    </div>
+    <div class="cz-panel" style="min-width:0">
+      <div><label>b</label><div class="cz-shift"><button data-act="b-">−</button><b id="af-bk">8</b><button data-act="b+">+</button></div></div>
+    </div>
+    <div class="cz-panel" style="min-width:min(360px,40vw)">
+      <div><label>HOLA BOB →</label><div class="cz-out" id="af-out"></div></div>
+    </div>
+  </div>
+  <div class="af-calc" id="af-calc"></div>
+  <div class="alpha" id="af-alpha"></div>
+  <div class="bf">⏱ fuerza bruta: <b>12 × 26 = 312 claves</b> → instantáneo</div>
+</section>
+
+<section class="slide" data-id="brute">
+  <div class="kicker">// 02 · fuerza bruta</div>
+  <h2 data-type>Oscar prueba todas las claves</h2>
+  <div class="brute">
+    <div class="oscar-solo"><div class="bubble"></div><svg class="ch" viewBox="0 0 120 150"><use href="#c-oscar"/></svg><div class="name r">Oscar</div><div class="lvl">rompe clásicos</div></div>
+    <div class="race">
+      <div class="lane" data-lane="caesar"><div class="top"><span>César · <span class="g">KROD ERE</span></span><span class="n d">0 / 25</span></div>
+        <div class="track"><div class="fill"></div></div><div class="try"></div></div>
+      <div class="lane" data-lane="affine"><div class="top"><span>Afín · <span class="g">RALI NAN</span></span><span class="n d">0 / 312</span></div>
+        <div class="track"><div class="fill"></div></div><div class="try"></div></div>
+    </div>
+  </div>
+  <div class="big" id="brute-big"></div>
+  <div class="controls"><button class="btn red" data-act="go">▶ Fuerza bruta</button></div>
+</section>
+
+<section class="slide" data-id="times">
+  <div class="kicker">// 02 · fuerza bruta · ¿cuánto tarda?</div>
+  <h2 data-type>Todo depende de cuántas claves hay</h2>
+  <div class="bft" id="bft-1"></div>
+  <div class="foot">Oscar prueba 10¹² claves por segundo · estimaciones aproximadas</div>
+  <div class="chips"><span class="chip">Esta idea <b>vuelve al final</b> con las computadoras cuánticas</span></div>
+</section>
+
+<section class="slide" data-id="enigma">
+  <div class="kicker">// 02 · enigma · 1930–1945</div>
+  <h2 data-type>La máquina Enigma</h2>
+  <div class="enigma">
+    <div class="photo main"><img src="img/enigma.jpg" alt="Máquina Enigma con rotores, teclado y clavijero"></div>
+    <div class="en-side">
+      <div class="photo rot"><img src="img/rotores.jpg" alt="Rotores de Enigma"></div>
+      <div>Un César que <span class="a">cambia en cada tecla</span>: los rotores giran.</div>
+      <div><span class="d">claves posibles:</span><div class="count" id="en-count">0</div></div>
+      <div class="bf" style="margin-top:0;align-self:flex-start">⏱ fuerza bruta: <b>~5 años</b></div>
+      <div class="en-break" id="en-break">
+        <div class="photo tur"><img src="img/turing.jpg" alt="Alan Turing"></div>
+        <div class="photo bom"><img src="img/bombe.jpg" alt="Réplica de la Bomba de Bletchley Park"></div>
+        <p><b>Turing y la Bomba</b> no probaron todo: usaron pistas (<i>cribs</i>) y errores de los operadores.<br><span class="g">→ horas</span></p>
+      </div>
+    </div>
+  </div>
+  <div class="controls"><button class="btn ghost" data-act="go">▶ ¿Cómo la rompieron?</button></div>
+  <div class="credit">Fotos: Wikimedia Commons · Karsten Sperling (dominio público) · TedColes (CC0) · Antoinetav (CC BY-SA 3.0) · Turing (dominio público)</div>
+</section>
+
+<!-- ============ 03 · Claves modernas (P3) ============ -->
+<section class="slide" data-id="div">
+  <div class="divider"><span class="num">03</span><h2 class="glitch" data-text="Claves modernas">Claves modernas</h2></div>
+</section>
+
+<section class="slide" data-id="sym">
+  <div class="kicker">// 03 · cifrado simétrico</div>
+  <h2 data-type>Simétrico: una llave, dos copias</h2>
+  <div class="legend">
+    <span class="g"><svg class="ic key"><use href="#i-key"/></svg> llave = <b>clave secreta</b></span>
+    <span class="g"><svg class="ic"><use href="#i-lock"/></svg> caja cerrada = <b>mensaje cifrado</b></span>
+  </div>
+  <div class="scene">
+    <div class="wire"></div><div class="tapline"></div><div class="tap"></div>
+    <div class="actor alice"><div class="bubble"></div><svg class="ch" viewBox="0 0 120 150"><use href="#c-alice"/></svg><div class="name">Alice</div>
+      <div class="tray" id="sym-atray"></div></div>
+    <div class="actor bob"><div class="bubble"></div><svg class="ch" viewBox="0 0 120 150"><use href="#c-bob"/></svg><div class="name">Bob</div>
+      <div class="tray" id="sym-btray"></div></div>
+    <div class="actor oscar"><div class="bubble"></div><svg class="ch" viewBox="0 0 120 150"><use href="#c-oscar"/></svg><div class="name">Oscar</div><div class="lvl">escucha</div></div>
+  </div>
+  <div class="steps">
+    <div class="step"><b>1</b>Alice y Bob tienen una copia de la <span class="g">misma llave</span>.</div>
+    <div class="step"><b>2</b>Alice cierra la caja con su llave.</div>
+    <div class="step"><b>3</b>La caja viaja. Oscar la ve, pero <span class="r">no la puede abrir</span>.</div>
+    <div class="step"><b>4</b>Bob abre con <span class="g">su copia</span> de la llave.</div>
+  </div>
+  <div class="hint" id="sym-hint"></div>
+  <div class="controls"><button class="btn" data-act="go"></button><button class="btn ghost" data-act="reset">↺</button></div>
+</section>
+
+<section class="slide" data-id="asym">
+  <div class="kicker">// 03 · cifrado asimétrico</div>
+  <h2 data-type>Asimétrico: candado y llave separados</h2>
+  <div class="legend">
+    <span class="g"><svg class="ic"><use href="#i-lock-open"/></svg> candado abierto = <b>clave pública</b> · se reparte</span>
+    <span class="a"><svg class="ic key"><use href="#i-key"/></svg> llave = <b>clave privada</b> · nunca sale de Bob</span>
+  </div>
+  <div class="scene">
+    <div class="wire"></div><div class="tapline"></div><div class="tap"></div>
+    <div class="actor alice"><div class="bubble"></div><svg class="ch" viewBox="0 0 120 150"><use href="#c-alice"/></svg><div class="name">Alice</div>
+      <div class="tray" id="asy-atray"></div></div>
+    <div class="actor bob"><div class="bubble"></div><svg class="ch" viewBox="0 0 120 150"><use href="#c-bob"/></svg><div class="name">Bob</div>
+      <div class="tray" id="asy-btray"></div></div>
+    <div class="actor oscar"><div class="bubble"></div><svg class="ch" viewBox="0 0 120 150"><use href="#c-oscar"/></svg><div class="name">Oscar</div><div class="lvl">copia llaves</div></div>
+  </div>
+  <div class="steps">
+    <div class="step"><b>1</b>Bob reparte <span class="g">candados abiertos</span>. Oscar también recibe uno.</div>
+    <div class="step"><b>2</b>Alice cierra la caja con el candado. <span class="g">Cerrar no necesita llave</span>.</div>
+    <div class="step"><b>3</b>La caja viaja. Oscar tiene candado, pero <span class="r">no la llave</span>.</div>
+    <div class="step"><b>4</b>Bob abre con su <span class="a">llave privada</span>.</div>
+  </div>
+  <div class="hint" id="asy-hint"></div>
+  <div class="controls"><button class="btn" data-act="go"></button><button class="btn ghost" data-act="reset">↺</button></div>
+</section>
+
+<section class="slide" data-id="types">
+  <div class="kicker">// 03 · los tipos</div>
+  <h2 data-type>Los algoritmos de cada familia</h2>
+  <div class="types">
+    <div class="tcol">
+      <h3 class="g">Simétrico</h3>
+      <div class="meta"><svg class="ic key"><use href="#i-key"/></svg> 1 llave · muy rápido</div>
+      <ul>
+        <li><b>DES</b><span>1977 · 56 bits</span><em class="tag no">roto</em></li>
+        <li><b>3DES</b><span>DES × 3</span><em class="tag no">retirado</em></li>
+        <li><b>AES</b><span>2001 · 128 / 256 bits</span><em class="tag ok">estándar</em></li>
+        <li><b>ChaCha20</b><span>rápido en celulares</span><em class="tag ok">en uso</em></li>
+      </ul>
+    </div>
+    <div class="tcol">
+      <h3 class="a">Asimétrico</h3>
+      <div class="meta"><svg class="ic"><use href="#i-lock-open"/></svg><svg class="ic key"><use href="#i-key"/></svg> 2 llaves · más lento</div>
+      <ul>
+        <li><b>Diffie-Hellman</b><span>1976 · acordar una llave</span><em class="tag ok">en uso</em></li>
+        <li><b>RSA</b><span>1977 · factorizar</span><em class="tag ok">el más usado</em></li>
+        <li><b>ECC</b><span>curvas elípticas · llaves chicas</span><em class="tag ok">en uso</em></li>
+      </ul>
+    </div>
+  </div>
+  <div class="combo">En la práctica se combinan: <span class="a">asimétrico</span> pasa la llave → <span class="g">simétrico</span> cifra los datos</div>
+</section>
+
+<section class="slide" data-id="rsa">
+  <div class="kicker">// 03 · rsa · rivest, shamir, adleman · 1977</div>
+  <h2 data-type>RSA: dos primos multiplicados</h2>
+  <div class="rsa">
+    <div class="pick"><label>primo p</label><div class="ctl"><button data-act="p-">−</button><b id="rsa-p">61</b><button data-act="p+">+</button></div></div>
+    <span class="eq">×</span>
+    <div class="pick"><label>primo q</label><div class="ctl"><button data-act="q-">−</button><b id="rsa-q">53</b><button data-act="q+">+</button></div></div>
+    <span class="eq">=</span>
+    <div class="pick"><label>n (público)</label><div class="nval" id="rsa-n">3233</div></div>
+  </div>
+  <div class="arrows">
+    <div><span class="g">p × q → n</span><br><small class="d">multiplicar: fácil</small></div>
+    <div><span class="r">n → p × q</span><br><small class="d">factorizar: muy difícil</small></div>
+  </div>
+  <div class="fact" id="rsa-fact"></div>
+  <div class="bign" id="rsa-big"></div>
+  <div class="controls"><button class="btn red" data-act="go">▶ Oscar factoriza n</button><button class="btn ghost" data-act="real">▶ ¿Y en la vida real?</button></div>
+</section>
+
+<!-- ============ 04 · Hash y futuro (P4) ============ -->
+<section class="slide" data-id="div">
+  <div class="divider"><span class="num">04</span><h2 class="glitch" data-text="Hash y futuro">Hash y futuro</h2></div>
+</section>
+
+<section class="slide" data-id="hash">
+  <div class="kicker">// 04 · hashing · sha-256</div>
+  <h2 data-type>Hash: la huella digital</h2>
+  <input class="hash-in" id="hash-in" maxlength="24" value="HOLA BOB" spellcheck="false" autocomplete="off">
+  <div class="arrow-down">↓ SHA-256</div>
+  <div class="hash-out" id="hash-out"></div>
+  <div class="diff" id="hash-diff"></div>
+  <div class="chips">
+    <span class="chip"><b>una sola vía</b> → no se puede volver atrás</span>
+    <span class="chip"><b>siempre 64</b> caracteres</span>
+    <span class="chip"><b>1 letra</b> → cambia todo</span>
+  </div>
+  <div class="controls"><button class="btn ghost" data-act="go">▶ Cambiar una letra</button></div>
+</section>
+
+<section class="slide" data-id="integ">
+  <div class="kicker">// 04 · hashing · para qué se usa</div>
+  <h2 data-type>Integridad: ¿lo cambiaron?</h2>
+  <div class="scene">
+    <div class="wire"></div><div class="tapline"></div><div class="tap"></div>
+    <div class="actor alice"><div class="bubble"></div><svg class="ch" viewBox="0 0 120 150"><use href="#c-alice"/></svg><div class="name">Alice</div></div>
+    <div class="actor bob"><div class="bubble"></div><svg class="ch" viewBox="0 0 120 150"><use href="#c-bob"/></svg><div class="name">Bob</div></div>
+    <div class="actor oscar"><div class="bubble"></div><svg class="ch" viewBox="0 0 120 150"><use href="#c-oscar"/></svg><div class="name">Oscar</div><div class="lvl">no puede abrir</div></div>
+  </div>
+  <div class="chips">
+    <span class="chip"><b>integridad</b> → Bob recalcula el hash y compara</span>
+    <span class="chip"><b>seguridad</b> → el banco guarda <span class="v" id="pw-hash"></span>, no <span class="a">clave123</span></span>
+    <span class="chip"><b>MD5 / SHA-1</b> → <span class="r">rotos</span></span>
+  </div>
+  <div class="controls">
+    <button class="btn" data-act="ok">▶ Enviar</button>
+    <button class="btn red" data-act="bad">▶ Oscar lo modifica</button>
+  </div>
+</section>
+
+<section class="slide" data-id="pq">
+  <div class="kicker">// 04 · criptografía post-cuántica</div>
+  <h2 data-type>Vuelve la fuerza bruta</h2>
+  <div class="bft" id="bft-2"></div>
+  <div class="foot">10¹² pasos por segundo · estimaciones teóricas aproximadas</div>
+  <div class="chips" id="pq-chips" style="visibility:hidden">
+    <span class="chip"><b>Shor</b> → rompe <span class="r">RSA</span> y ECC</span>
+    <span class="chip"><b>Grover</b> → AES pierde la mitad de los bits → <span class="g">usar AES-256</span></span>
+    <span class="chip"><b>NIST 2024</b> → nuevos: <span class="g">ML-KEM</span> y <span class="g">ML-DSA</span></span>
+    <span class="chip"><b>"guardar hoy, descifrar mañana"</b></span>
+  </div>
+  <div class="controls"><button class="btn violet" data-act="go">⚛ Encender computadora cuántica</button></div>
+</section>
+
+<!-- ============ Cierre ============ -->
+<section class="slide" data-id="close">
+  <div class="kicker">// para llevarse</div>
+  <h2 data-type>Tres ideas</h2>
+  <div class="takeaways">
+    <div class="tk"><span class="n">1</span><span>Sin cifrado, <span class="r">Oscar lee todo</span>.</span></div>
+    <div class="tk"><span class="n">2</span><span>La seguridad está en <span class="a">cuántas claves</span> hay que probar.</span></div>
+    <div class="tk"><span class="n">3</span><span><span class="v">Hash</span> cuida la integridad; lo <span class="v">cuántico</span> obliga a cambiar algoritmos.</span></div>
+  </div>
+</section>
+
+<section class="slide" data-id="qa">
+  <h1>¿Preguntas<span class="g">?</span></h1>
+  <div class="sub">Oscar también está escuchando</div>
+  <svg class="peek" viewBox="0 0 120 150"><use href="#c-oscar"/></svg>
+</section>
+
+<div class="progress" id="progress"></div>
+<div class="nav"><button id="prev" aria-label="Anterior">‹</button><span id="count"></span><button id="next" aria-label="Siguiente">›</button></div>
+
+<script>
+/* ================= núcleo ================= */
+const $=(s,r=document)=>r.querySelector(s), $$=(s,r=document)=>[...r.querySelectorAll(s)];
+const slides=$$('.slide');
+let cur=0, epoch=0;
+const wait=ms=>new Promise(r=>setTimeout(r,ms));
+const alive=t=>t===epoch;
+const AB='ABCDEFGHIJKLMNOPQRSTUVWXYZ';
+const caesar=(s,k)=>s.replace(/[A-Z]/g,c=>AB[(AB.indexOf(c)+k+26)%26]);
+const JUNK='#$%@!?§¤ØÆΞ¥x9Qz7';
+const junk=n=>Array.from({length:n},()=>JUNK[Math.random()*JUNK.length|0]).join('');
+const ic=(id,cls='')=>`<svg class="ic ${cls}"><use href="#${id}"/></svg>`;
+
+function go(i){
+  i=Math.max(0,Math.min(slides.length-1,i));
+  epoch++;
+  $$('.flyer,.dragghost').forEach(e=>e.remove());
+  slides[cur].classList.remove('active');
+  cur=i;
+  const s=slides[cur];
+  s.classList.add('active');
+  const h=$('[data-type]',s); if(h) typeIn(h);
+  S[s.dataset.id]?.enter?.(s);
+  $('#progress').style.width=(cur/(slides.length-1)*100)+'%';
+  $('#count').textContent=(cur+1)+' / '+slides.length;
+  history.replaceState(null,'','#'+(cur+1));
+}
+async function typeIn(el){
+  const t=epoch; el.dataset.full ??= el.textContent;
+  const full=el.dataset.full; el.textContent=''; el.classList.add('typing');
+  for(const ch of full){ if(!alive(t)) break; el.textContent+=ch; await wait(32); }
+  el.textContent=full; await wait(900); el.classList.remove('typing');
+}
+document.addEventListener('keydown',e=>{
+  if(e.target.matches('input')) { if(e.key==='Escape') e.target.blur(); return; }
+  if(['ArrowRight','PageDown',' '].includes(e.key)){e.preventDefault();go(cur+1)}
+  if(['ArrowLeft','PageUp'].includes(e.key)){e.preventDefault();go(cur-1)}
+  if(e.key==='Home')go(0); if(e.key==='End')go(slides.length-1);
+});
+$('#prev').onclick=()=>go(cur-1); $('#next').onclick=()=>go(cur+1);
+
+/* ================= escena ================= */
+const pos=p=>{ if(Array.isArray(p)) return p; const t=p.querySelector?.('svg.ch')||p; const r=t.getBoundingClientRect(); return [r.left+r.width/2,r.top+r.height/2]; };
+function flyer(html){ const f=document.createElement('div'); f.className='flyer'; f.innerHTML=html; document.body.appendChild(f); return f; }
+function place(f,p){ const [x,y]=pos(p); f.style.transform=`translate(${x-f.offsetWidth/2}px,${y-f.offsetHeight/2}px)`; }
+async function move(f,a,b,dur=900){
+  const [x0,y0]=pos(a),[x1,y1]=pos(b), w=f.offsetWidth/2, h=f.offsetHeight/2;
+  f.getAnimations().forEach(x=>x.cancel());
+  const an=f.animate([{transform:`translate(${x0-w}px,${y0-h}px)`},{transform:`translate(${x1-w}px,${y1-h}px)`}],
+    {duration:dur,easing:'cubic-bezier(.5,0,.3,1)',fill:'forwards'});
+  try{ await Promise.race([an.finished,wait(dur+150)]) }catch(e){}
+}
+/* recorre stops; onStop(i,f) se llama al llegar a cada parada */
+async function travel(html,stops,{seg=900,onStop,keep=false}={}){
+  const t=epoch, f=flyer(html); place(f,stops[0]);
+  for(let i=1;i<stops.length;i++){
+    await move(f,stops[i-1],stops[i],seg);
+    if(!alive(t)){f.remove();return null}
+    if(onStop) await onStop(i,f);
+    if(!alive(t)){f.remove();return null}
+  }
+  if(!keep) f.remove(); return f;
+}
+function bubble(actor,html,cls=''){ const b=$('.bubble',actor); b.className='bubble show '+cls; b.innerHTML=html; }
+function hush(root){ $$('.bubble',root).forEach(b=>b.className='bubble'); $$('.oscar',root).forEach(o=>o.classList.remove('sniff')); }
+function level(root,txt){ const l=$('.oscar .lvl',root)||$('.lvl',root); if(!l) return; l.textContent=txt; l.classList.remove('bump'); void l.offsetWidth; l.classList.add('bump'); }
+const who=s=>({a:$('.alice',s),b:$('.bob',s),o:$('.oscar',s),tap:$('.tap',s)});
+
+/* drag & drop: arrastrar item hasta target. Un clic sin arrastrar también vale. */
+function draggable(item,getTarget,onDrop){
+  item.addEventListener('pointerdown',e=>{
+    if(!item.classList.contains('can')) return;
+    e.preventDefault();
+    const r=item.getBoundingClientRect(), g=item.cloneNode(true);
+    g.classList.add('dragghost'); g.classList.remove('can');
+    Object.assign(g.style,{left:r.left+'px',top:r.top+'px',width:r.width+'px'});
+    document.body.appendChild(g); item.style.opacity=.25;
+    const dx=e.clientX-r.left, dy=e.clientY-r.top; let moved=false; const t0=[e.clientX,e.clientY];
+    const mv=ev=>{ if(Math.hypot(ev.clientX-t0[0],ev.clientY-t0[1])>6) moved=true;
+      g.style.left=(ev.clientX-dx)+'px'; g.style.top=(ev.clientY-dy)+'px'; };
+    const up=ev=>{
+      removeEventListener('pointermove',mv); removeEventListener('pointerup',up);
+      const tr=getTarget().getBoundingClientRect(), pad=40;
+      const inside=ev.clientX>tr.left-pad&&ev.clientX<tr.right+pad&&ev.clientY>tr.top-pad&&ev.clientY<tr.bottom+pad;
+      if(!moved||inside){ g.remove(); item.style.opacity=''; onDrop(); }
+      else { g.animate([{left:g.style.left,top:g.style.top},{left:r.left+'px',top:r.top+'px'}],{duration:250}).finished.then(()=>{g.remove();item.style.opacity=''}); }
+    };
+    addEventListener('pointermove',mv); addEventListener('pointerup',up);
+  });
+}
+
+/* ================= SHA-256 (sin dependencias, funciona offline) ================= */
+const sha256=(()=>{const P=[];for(let n=2;P.length<64;n++)if(P.every(p=>n%p))P.push(n);
+const fr=x=>((x-Math.floor(x))*4294967296)>>>0, K=P.map(p=>fr(Math.cbrt(p))), H0=P.slice(0,8).map(p=>fr(Math.sqrt(p)));
+const r=(x,n)=>(x>>>n)|(x<<(32-n));
+return str=>{const m=new TextEncoder().encode(str), l=m.length, L=((l+9+63)>>6)<<6, b=new Uint8Array(L); b.set(m); b[l]=0x80;
+const dv=new DataView(b.buffer); dv.setUint32(L-4,(l*8)>>>0); dv.setUint32(L-8,Math.floor(l*8/4294967296));
+const H=H0.slice(), W=new Array(64);
+for(let o=0;o<L;o+=64){ for(let t=0;t<16;t++) W[t]=dv.getUint32(o+t*4);
+ for(let t=16;t<64;t++){const a=W[t-15],c=W[t-2];W[t]=(W[t-16]+(r(a,7)^r(a,18)^(a>>>3))+W[t-7]+(r(c,17)^r(c,19)^(c>>>10)))|0;}
+ let [a,bb,c,d,e,f,g,h]=H;
+ for(let i=0;i<64;i++){const t1=(h+(r(e,6)^r(e,11)^r(e,25))+((e&f)^(~e&g))+K[i]+W[i])|0, t2=((r(a,2)^r(a,13)^r(a,22))+((a&bb)^(a&c)^(bb&c)))|0;
+  h=g;g=f;f=e;e=(d+t1)|0;d=c;c=bb;bb=a;a=(t1+t2)|0;}
+ H[0]=(H[0]+a)|0;H[1]=(H[1]+bb)|0;H[2]=(H[2]+c)|0;H[3]=(H[3]+d)|0;H[4]=(H[4]+e)|0;H[5]=(H[5]+f)|0;H[6]=(H[6]+g)|0;H[7]=(H[7]+h)|0;}
+return H.map(x=>(x>>>0).toString(16).padStart(8,'0')).join('');};})();
+
+/* ================= slides ================= */
+const S={};
+
+/* ---- modelo (Paar): x → e → y por el canal inseguro → d → x ---- */
+S.model={enter(s){
+  hush(s);
+  const pm=$('.pm',s), lg=$('.pm-legend',s), btn=$('[data-act=go]',s);
+  pm.classList.remove('reveal'); lg.classList.remove('reveal');
+  btn.disabled=false; btn.textContent='▶ Agregar cifrado';
+  btn.onclick=async()=>{
+    if(!pm.classList.contains('reveal')){
+      pm.classList.add('reveal'); lg.classList.add('reveal'); btn.textContent='▶ Enviar'; return;
+    }
+    const t=epoch, a=$('.alice',s), b=$('.bob',s), o=$('.oscar',s), e=$('#pm-e'), d=$('#pm-d'), tap=$('.pm-chan .tap',s);
+    hush(s); btn.disabled=true;
+    const y=junk(8);
+    await travel(`<span class="pkt">x = HOLA BOB</span>`,[a,e,tap,d,b],{seg:800,onStop:async(i,f)=>{
+      if(i===1){ f.innerHTML=`<span class="pkt cipher">y = ${y}</span>`; await wait(500); }
+      if(i===2){ o.classList.add('sniff'); bubble(o,`y = ${y} … ¿?`,'dim'); await wait(1300); }
+      if(i===3){ f.innerHTML=`<span class="pkt">x = HOLA BOB</span>`; await wait(500); }
+    }});
+    if(!alive(t)) return;
+    bubble(b,'HOLA BOB','green');
+    btn.disabled=false; btn.textContent='↺ Repetir';
+  };
+}};
+
+/* ---- escena inicial ---- */
+S.hook={enter(s){
+  hush(s); level(s,'escucha'); $('.stamp',s).classList.remove('show');
+  const btn=$('[data-act=go]',s); btn.disabled=false; btn.textContent='▶ Ingresar';
+  btn.onclick=async()=>{
+    const t=epoch, {a,b,o,tap}=who(s);
+    hush(s); $('.stamp',s).classList.remove('show'); btn.disabled=true;
+    await travel(`<span class="pkt">usuario=alice&amp;password=<span class="pw">clave123</span></span>`,[a,tap,b],{seg:1100,
+      onStop:async i=>{ if(i===1){ o.classList.add('sniff'); bubble(o,'¡clave123!','red'); level(s,'lee todo'); await wait(1600); } }});
+    if(!alive(t)) return;
+    bubble(b,'Bienvenida, Alice','green');
+    await wait(700); if(!alive(t)) return;
+    $('.stamp',s).classList.add('show');
+    btn.disabled=false; btn.textContent='↺ Repetir';
+  };
+}};
+
+/* ---- lab: volcados reales de capturas/ ---- */
+const HTTP_HEX='b7a5504f5354202f6c6f67696e20485454502f312e310d0a486f73743a203132372e302e302e313a383030300d0a557365722d4167656e743a206375726c2f382e32322e300d0a4163636570743a202a2f2a0d0a436f6e74656e742d4c656e6774683a2033310d0a436f6e74656e742d547970653a206170706c69636174696f6e2f782d7777772d666f726d2d75726c656e636f6465640d0a0d0a7573756172696f3d616c6963652670617373776f72643d636c617665313233';
+const TLS_HEX='949017030300c9f6fc6563d9d8f2f41ff0cd79a73ef96f9648c1ea3014c76418fb9344c90d81b52513ac1f35dc2119e0f6f627277e896bab9a63782b9b367bd6bff3e94751c1f938e35287f8e2fd6e0192452374e6e5e6b4034f33543a787b85075883411ce8d45682cd138f63a9f7160a2e842109214eec6a1dc0610227e4acc06de201997dc7488627c0f38306ac0a17e0bfb34ee6452e823514d8251072f6434b84ca9bffad61fb32528cbab5941c8257390e213d5dac2be5a48062fcc782638c2ae3c596580346c2a85e151950ff';
+const bytes=h=>h.match(/../g).map(x=>parseInt(x,16));
+function dumpRows(hex,cls){
+  const bs=bytes(hex), rows=[];
+  for(let r=0;r<bs.length;r+=16){
+    const off=(0x40+r).toString(16).padStart(4,'0');
+    let hx='',as='';
+    for(let c=0;c<16;c++){
+      const i=r+c;
+      if(i>=bs.length){ hx+='   '; continue; }
+      const b=bs[i], k=cls(i), ch=b>=32&&b<127?String.fromCharCode(b).replace('&','&amp;').replace('<','&lt;'):'.';
+      hx+=`<span class="${k}">${b.toString(16).padStart(2,'0')}</span> `; as+=`<span class="${k}">${ch}</span>`;
+    }
+    rows.push(`<span class="dump-row"><span class="off">${off}</span>  ${hx}  ${as}</span>`);
+  }
+  return rows;
+}
+function labSlide(hex,cls,verdict){ return {enter(s){
+  const out=$('.out',s), btn=$('[data-act=go]',s); out.innerHTML=''; btn.disabled=false;
+  btn.onclick=async()=>{
+    const t=epoch; btn.disabled=true; out.innerHTML='';
+    for(const r of dumpRows(hex,cls)){ out.insertAdjacentHTML('beforeend',r); await wait(90); if(!alive(t)) return; }
+    await wait(500); if(!alive(t)) return;
+    out.insertAdjacentHTML('beforeend',verdict);
+  };
+}}}
+const PW=bytes(HTTP_HEX).length-31; // cuerpo del formulario (Content-Length: 31)
+S['lab-http']=labSlide(HTTP_HEX,i=>i>=PW?'hot':(i>=2&&i<13?'hdr':'hx'),
+  `<span class="verdict r">→ Oscar lee: usuario=alice&amp;password=clave123</span>`);
+S['lab-https']=labSlide(TLS_HEX,i=>i>=2&&i<7?'hdr':(i<2?'hx':'enc'),
+  `<span class="verdict"><span class="a">17 03 03</span> <span class="d">= datos cifrados · el resto es basura</span>\n<span class="g">→ buscar "clave123": 0 resultados</span></span>`);
+
+/* ---- César ---- */
+(()=>{
+  const s=$('[data-id=caesar]'), outer=$('.outer',s), inner=$('#inner',s);
+  AB.split('').forEach((c,i)=>{
+    const a=i*360/26;
+    outer.insertAdjacentHTML('beforeend',`<text transform="rotate(${a}) translate(0,-135)">${c}</text>`);
+    inner.insertAdjacentHTML('beforeend',`<text transform="rotate(${a}) translate(0,-100)">${c}</text>`);
+  });
+  const oT=$$('text',outer), iT=$$('text',inner), inp=$('#cz-in'), out=$('#cz-out');
+  let k=3, run=0;
+  async function render(anim=true){
+    const my=++run, t=epoch;
+    inner.style.transform=`rotate(${-k*360/26}deg)`;
+    $('#cz-k').textContent=k; $('#cz-center').textContent=k;
+    const p=inp.value.toUpperCase().replace(/[^A-Z ]/g,''); inp.value=p;
+    out.innerHTML=p.split('').map(c=>`<span>${c===' '?'&nbsp;':c}</span>`).join('');
+    const spans=$$('span',out);
+    for(let i=0;i<p.length;i++){
+      if(p[i]===' ') continue;
+      if(anim){ await wait(230); if(my!==run||!alive(t)) return; }
+      const j=AB.indexOf(p[i]);
+      [...oT,...iT].forEach(x=>x.classList.remove('hl'));
+      oT[j].classList.add('hl'); iT[(j+k)%26].classList.add('hl');
+      spans[i].textContent=caesar(p[i],k); spans[i].classList.add('flip');
+    }
+    if(anim){ await wait(500); if(my===run) [...oT,...iT].forEach(x=>x.classList.remove('hl')); }
+  }
+  $('[data-act=minus]',s).onclick=()=>{k=(k+25)%26;render()};
+  $('[data-act=plus]',s).onclick=()=>{k=(k+1)%26;render()};
+  inp.oninput=()=>render(false);
+  S.caesar={enter(){ k=3; inp.value='HOLA BOB'; inner.style.transition='none'; inner.style.transform='rotate(0deg)';
+    void inner.getBoundingClientRect(); inner.style.transition=''; out.innerHTML='';
+    setTimeout(()=>render(),700); }};
+})();
+
+/* ---- aritmética modular ---- */
+(()=>{
+  const s=$('[data-id=mod]'), ring=$('#mod-ring'), hand=$('#mod-hand'), eq=$('#mod-eq'), res=$('#mod-res'), note=$('#mod-note');
+  let run=0, ang=0;
+  function draw(labels,size){
+    const N=labels.length;
+    ring.innerHTML=labels.map((l,i)=>`<text transform="rotate(${i*360/N}) translate(0,-100) rotate(${-i*360/N})" style="font-size:${size}px">${l}</text>`).join('');
+  }
+  async function play(labels,size,start,add,show){
+    const my=++run, t=epoch, N=labels.length;
+    draw(labels,size); const tx=$$('text',ring);
+    eq.innerHTML=''; res.innerHTML=''; note.innerHTML='';
+    hand.style.transition='none'; ang=start*360/N; hand.style.transform=`rotate(${ang}deg)`;
+    void hand.getBoundingClientRect(); hand.style.transition='';
+    tx[start].classList.add('hl');
+    await wait(500); if(my!==run||!alive(t)) return;
+    for(let k=1;k<=add;k++){
+      ang+=360/N; hand.style.transform=`rotate(${ang}deg)`;
+      tx.forEach(x=>x.classList.remove('hl')); tx[(start+k)%N].classList.add('hl');
+      eq.innerHTML=show.eq(k);
+      await wait(380); if(my!==run||!alive(t)) return;
+    }
+    res.innerHTML=show.res; note.innerHTML=show.note;
+  }
+  const clock=()=>play(['12',1,2,3,4,5,6,7,8,9,10,11],22,10,5,{
+    eq:k=>`10 + ${k}${k===5?' = 15':''}`,
+    res:'15 mod 12 = <b>3</b>', note:'15 ÷ 12 = 1, resto 3 → son las 3'});
+  const abc=()=>play(AB.split(''),13,23,3,{
+    eq:k=>`X + ${k}${k===3?' = 23 + 3 = 26':''}`,
+    res:'26 mod 26 = <b>0</b> → A', note:'así César "da la vuelta" al abecedario'});
+  $('[data-act=clock]',s).onclick=clock;
+  $('[data-act=abc]',s).onclick=abc;
+  S.mod={enter(){ setTimeout(clock,700); }};
+})();
+
+/* ---- Afín ---- */
+const AS=[1,3,5,7,9,11,15,17,19,21,23,25];
+const inv26=a=>AS.find(x=>(a*x)%26===1);
+const unaffine=(s,a,b)=>s.replace(/[A-Z]/g,c=>AB[((inv26(a)*(AB.indexOf(c)-b))%26+26)%26]);
+(()=>{
+  const s=$('[data-id=affine]'), out=$('#af-out'), calc=$('#af-calc'), alpha=$('#af-alpha');
+  let ai=2, b=8, run=0; const MSG='HOLA BOB';
+  alpha.innerHTML=AB.split('').map(c=>`<span class="p">${c}</span>`).join('')+AB.split('').map(()=>`<span class="c"></span>`).join('');
+  const P=$$('.p',alpha), C=$$('.c',alpha);
+  async function render(anim=true){
+    const my=++run, t=epoch, a=AS[ai];
+    $('#af-a').textContent=a; $('#af-b').textContent=b; $('#af-ak').textContent=a; $('#af-bk').textContent=b;
+    C.forEach((x,i)=>x.textContent=AB[(a*i+b)%26]);
+    out.innerHTML=MSG.split('').map(c=>`<span>${c===' '?'&nbsp;':c}</span>`).join('');
+    const spans=$$('span',out);
+    for(let i=0;i<MSG.length;i++){
+      if(MSG[i]===' ') continue;
+      const x=AB.indexOf(MSG[i]), y=(a*x+b)%26;
+      if(anim){
+        [...P,...C].forEach(z=>z.classList.remove('hl')); P[x].classList.add('hl'); C[x].classList.add('hl');
+        calc.innerHTML=`<b>${MSG[i]}</b> = ${x} → ${a}·${x} + ${b} = ${a*x+b} → mod 26 = ${y} → <i>${AB[y]}</i>`;
+        await wait(700); if(my!==run||!alive(t)) return;
+      }
+      spans[i].textContent=AB[y]; spans[i].classList.add('flip');
+    }
+    [...P,...C].forEach(z=>z.classList.remove('hl'));
+    if(!anim) calc.innerHTML='';
+  }
+  $('[data-act="a-"]',s).onclick=()=>{ai=(ai+AS.length-1)%AS.length;render(false)};
+  $('[data-act="a+"]',s).onclick=()=>{ai=(ai+1)%AS.length;render(false)};
+  $('[data-act="b-"]',s).onclick=()=>{b=(b+25)%26;render(false)};
+  $('[data-act="b+"]',s).onclick=()=>{b=(b+1)%26;render(false)};
+  S.affine={enter(){ ai=2; b=8; run++; calc.innerHTML=''; out.innerHTML=''; setTimeout(()=>render(),800); }};
+})();
+
+/* ---- fuerza bruta ---- */
+S.brute={enter(s){
+  const big=$('#brute-big'), btn=$('[data-act=go]',s), o=$('.oscar-solo',s);
+  big.textContent=''; hush(s); btn.disabled=false;
+  $$('.lane',s).forEach(l=>{ $('.fill',l).style.width='0'; $('.try',l).textContent=''; $('.try',l).className='try'; $('.n',l).textContent='0 / '+(l.dataset.lane==='caesar'?25:312); });
+  const lanes={
+    caesar:{total:25, cand:i=>caesar('KROD ERE',-(i+1)), delay:110},
+    affine:{total:312, cand:i=>unaffine('RALI NAN',AS[i/26|0],i%26), delay:12}
+  };
+  async function runLane(name){
+    const t=epoch, l=$(`[data-lane=${name}]`,s), L=lanes[name];
+    for(let i=0;i<L.total;i++){
+      const txt=L.cand(i);
+      $('.n',l).textContent=`${i+1} / ${L.total}`; $('.fill',l).style.width=((i+1)/L.total*100)+'%';
+      $('.try',l).textContent='prueba: '+txt;
+      if(txt==='HOLA BOB'){ $('.try',l).textContent='✓ HOLA BOB'; $('.try',l).classList.add('hit'); return; }
+      await wait(L.delay); if(!alive(t)) return;
+    }
+  }
+  btn.onclick=async()=>{
+    const t=epoch; btn.disabled=true; big.textContent=''; hush(s);
+    $$('.lane',s).forEach(l=>{ $('.try',l).className='try'; });
+    await Promise.all([runLane('caesar'),runLane('affine')]);
+    if(!alive(t)) return;
+    bubble(o,'¡HOLA BOB!','red');
+    big.innerHTML='Oscar las prueba todas en <span class="r">menos de 1 segundo</span>';
+    btn.disabled=false;
+  };
+}};
+
+/* ---- tabla de tiempos de fuerza bruta (escala logarítmica) ---- */
+const BF=[
+  {n:'César',k:'25 claves',s:1e-11,t:'instantáneo'},
+  {n:'Afín',k:'312 claves',s:1e-10,t:'instantáneo'},
+  {n:'DES',k:'2⁵⁶ claves',s:7.2e4,t:'~20 horas',q:{s:7.2e4,t:'ya estaba roto'}},
+  {n:'Enigma',k:'1,6·10²⁰ claves',s:1.6e8,t:'~5 años'},
+  {n:'RSA-2048',k:'factorizar n',s:3e19,t:'billones de años',q:{s:6e5,t:'días (Shor)'}},
+  {n:'AES-128',k:'2¹²⁸ claves',s:3.4e26,t:'10¹⁹ años',q:{s:1.8e7,t:'meses (Grover, teórico)'}},
+  {n:'AES-256',k:'2²⁵⁶ claves',s:1.2e65,t:'10⁵⁷ años',q:{s:3.4e26,t:'10¹⁹ años (Grover)'}},
+];
+const UNIVERSE=4.35e17; // edad del universo en segundos
+const wpct=s=>Math.max(1.5,Math.min(100,(Math.log10(s)+12)/42*100));
+function bfTable(el){
+  el.innerHTML=`<div class="bft-mark" style="left:calc(9.5em + (100% - 22.5em) * ${wpct(UNIVERSE)/100})"><span>edad del universo</span></div>`+
+    BF.map(r=>`<div class="bft-row"><div class="nm"><b>${r.n}</b><small>${r.k}</small></div><div class="bar"><div class="fillb"></div></div><div class="tt"></div></div>`).join('');
+  $$('.bft-row',el).forEach((x,i)=>x.style.animationDelay=(i*.18)+'s');
+  const set=quantum=>{
+    const t=epoch;
+    $$('.bft-row',el).forEach((row,i)=>{
+      const r=BF[i], v=quantum&&r.q?r.q:r, ok=v.s>UNIVERSE, f=$('.fillb',row), tt=$('.tt',row);
+      f.className='fillb '+(ok?'safe':'broken'); tt.className='tt '+(ok?'safe':'broken'); tt.textContent=v.t;
+      setTimeout(()=>{ if(alive(t)) f.style.width=wpct(v.s)+'%'; },120+i*180);
+    });
+  };
+  return {show(){ el.classList.remove('show'); void el.offsetWidth; el.classList.add('show'); set(false); }, quantum:()=>set(true)};
+}
+S.times={enter(){ bfTable($('#bft-1')).show(); }};
+
+/* ---- Enigma ---- */
+S.enigma={enter(s){
+  const t=epoch, c=$('#en-count'), br=$('#en-break'), btn=$('[data-act=go]',s);
+  br.classList.remove('show'); btn.disabled=false;
+  const N=158962555217826360000n; c.textContent='0';
+  (async()=>{ await wait(600);
+    for(let i=1;i<=40;i++){ if(!alive(t)) return;
+      const v=i===40?N:BigInt(Math.floor(Number(N)*Math.pow(i/40,6)));
+      c.textContent=v.toLocaleString('es-AR'); await wait(30); }
+  })();
+  btn.onclick=()=>{ br.classList.add('show'); btn.disabled=true; };
+}};
+
+/* ---- pasos numerados: marca el actual y los ya hechos ---- */
+const stepper=s=>{ const st=$$('.step',s); return i=>st.forEach((x,j)=>{ x.classList.toggle('on',j===i); x.classList.toggle('done',j<i); }); };
+
+/* ---- simétrico ---- */
+S.sym={enter(s){
+  const {a,b,o,tap}=who(s), at=$('#sym-atray'), bt=$('#sym-btray'), hint=$('#sym-hint'), btn=$('[data-act=go]',s), on=stepper(s);
+  let state=0;
+  const box=()=>$('#sym-box');
+  function reset(){
+    epoch++; $$('.flyer,.dragghost').forEach(e=>e.remove());
+    hush(s); level(s,'escucha'); state=0; on(0);
+    at.innerHTML=`<div class="box" id="sym-box">✉ HOLA BOB</div><div class="item pub">${ic('i-key','key')}llave</div>`;
+    bt.innerHTML=`<div class="item pub">${ic('i-key','key')}copia</div>`;
+    hint.innerHTML=''; hint.className='hint';
+    btn.style.display=''; btn.disabled=false; btn.textContent='▶ Siguiente';
+  }
+  btn.onclick=async()=>{
+    const t=epoch; btn.disabled=true;
+    if(state===0){
+      const bx=box(); bx.classList.add('locked'); bx.innerHTML=`${ic('i-lock')} ${junk(6)}`;
+      bubble(a,'¡Cerrada!','green'); on(1); state=1;
+    } else if(state===1){
+      hush(s); on(2);
+      const bx=box(), html=bx.outerHTML.replace('id="sym-box"',''); bx.style.visibility='hidden';
+      await travel(html,[bx,tap,bt],{seg:1000,onStop:async(i,f)=>{
+        if(i===1){ o.classList.add('sniff'); f.firstElementChild.classList.add('shake'); bubble(o,'No tengo la llave…','dim'); level(s,'no puede abrir'); await wait(1300); }
+      }});
+      if(!alive(t)) return;
+      bx.remove(); bt.insertAdjacentHTML('afterbegin',html.replace('<div class="box','<div id="sym-box" class="box'));
+      state=2;
+    } else if(state===2){
+      hush(s); on(3);
+      const bx=box(); bx.className='box open'; bx.innerHTML=`${ic('i-lock-open')} HOLA BOB`;
+      bubble(b,'HOLA BOB','green'); state=3; btn.textContent='▶ ¿Cómo consiguió Bob la copia?';
+    } else if(state===3){
+      hush(s); on(4);
+      await travel(`<span class="pkt cipher">${ic('i-key','key')}</span>`,[a,tap,b],{seg:1000,onStop:async i=>{
+        if(i===1){ travel(`<span class="pkt bad">${ic('i-key','key')}</span>`,[tap,o],{seg:700});
+          o.classList.add('sniff'); await wait(800); bubble(o,'¡Copié la llave! Ahora abro todo','red'); level(s,'copia llaves'); await wait(700); }
+      }});
+      if(!alive(t)) return;
+      hint.innerHTML='<span class="r">Problema:</span> para compartir la llave hay que mandarla… y Oscar copia todo lo que pasa';
+      hint.className='hint show'; btn.style.display='none'; state=4; return;
+    }
+    btn.disabled=false;
+  };
+  $('[data-act=reset]',s).onclick=reset;
+  reset();
+}};
+
+/* ---- asimétrico ---- */
+S.asym={enter(s){
+  const {a,b,o,tap}=who(s), at=$('#asy-atray'), bt=$('#asy-btray'), hint=$('#asy-hint'), btn=$('[data-act=go]',s), on=stepper(s);
+  let state=0;
+  const setHint=h=>{ hint.innerHTML=h; hint.className='hint'; void hint.offsetWidth; hint.className='hint show'; };
+  function reset(){
+    epoch++; $$('.flyer,.dragghost').forEach(e=>e.remove());
+    hush(s); level(s,'copia llaves'); state=0; on(0);
+    at.innerHTML=`<div class="box" id="asy-box">✉ HOLA BOB</div>`;
+    bt.innerHTML=`<div class="item pub" id="asy-pub">${ic('i-lock-open')}candados</div><div class="item priv" id="asy-priv">${ic('i-key','key')}privada</div>`;
+    hint.innerHTML=''; hint.className='hint';
+    btn.style.display=''; btn.disabled=false; btn.textContent='▶ Bob reparte candados';
+    draggable($('#asy-priv'),()=>$('#asy-box'),openBox);
+  }
+  const box=()=>$('#asy-box');
+  async function share(){
+    const t=epoch; btn.disabled=true;
+    const pl=`<span class="pkt cipher">${ic('i-lock-open')}</span>`;
+    await travel(pl,[$('#asy-pub'),tap,a],{seg:900,onStop:async i=>{
+      if(i===1){ travel(`<span class="pkt bad">${ic('i-lock-open')}</span>`,[tap,o],{seg:700});
+        await wait(700); bubble(o,'Tengo un candado… ¿y?','dim'); }
+    }});
+    if(!alive(t)) return;
+    at.insertAdjacentHTML('afterbegin',`<div class="item pub can" id="asy-lock">${ic('i-lock-open')}candado</div>`);
+    draggable($('#asy-lock'),box,lockBox);
+    box().classList.add('target'); btn.style.display='none'; state=1; on(1);
+    setHint('Arrastrá el <span class="g">candado</span> hasta la caja de Alice');
+  }
+  function lockBox(){
+    if(state!==1) return; state=2;
+    $('#asy-lock').remove();
+    const bx=box(); bx.classList.remove('target'); bx.classList.add('locked'); bx.innerHTML=`${ic('i-lock')} ${junk(6)}`;
+    bubble(a,'¡Cerrada! Y sin llave','green'); hint.className='hint';
+    btn.style.display=''; btn.disabled=false; btn.textContent='▶ Enviar caja';
+  }
+  async function send(){
+    const t=epoch; btn.disabled=true; hush(s); on(2);
+    const bx=box(), html=bx.outerHTML.replace('id="asy-box"',''); bx.style.visibility='hidden';
+    await travel(html,[bx,tap,$('#asy-priv')],{seg:1000,onStop:async(i,f)=>{
+      if(i===1){ o.classList.add('sniff'); f.firstElementChild.classList.add('shake'); bubble(o,'Mi candado no la abre…','red'); level(s,'no puede abrir'); await wait(1300); }
+    }});
+    if(!alive(t)) return;
+    bx.remove(); bt.insertAdjacentHTML('afterbegin',html.replace('<div class="box','<div id="asy-box" class="target box'));
+    $('#asy-priv').classList.add('can'); state=3; btn.style.display='none'; on(3);
+    setHint('Arrastrá la <span class="a">llave privada</span> hasta la caja');
+  }
+  function openBox(){
+    if(state!==3) return; state=4; on(4);
+    $('#asy-priv').classList.remove('can');
+    const bx=box(); bx.className='box open'; bx.innerHTML=`${ic('i-lock-open')} HOLA BOB`;
+    bubble(b,'HOLA BOB','green');
+    setHint('La llave privada <span class="g">nunca viajó</span> → Oscar no tiene nada que copiar');
+  }
+  btn.onclick=()=>{ if(state===0) share(); else if(state===2) send(); };
+  $('[data-act=reset]',s).onclick=reset;
+  reset();
+}};
+
+/* ---- RSA ---- */
+(()=>{
+  const PR=[3,5,7,11,13,17,19,23,29,31,37,41,43,47,53,59,61,67,71,73,79,83,89,97,101,103,107,109,113];
+  const s=$('[data-id=rsa]'), fact=$('#rsa-fact'), big=$('#rsa-big');
+  let pi=PR.indexOf(61), qi=PR.indexOf(53), run=0;
+  const render=()=>{ run++; const p=PR[pi],q=PR[qi];
+    $('#rsa-p').textContent=p; $('#rsa-q').textContent=q; $('#rsa-n').textContent=p*q; fact.innerHTML=''; big.classList.remove('show'); };
+  $('[data-act="p-"]',s).onclick=()=>{pi=(pi+PR.length-1)%PR.length;render()};
+  $('[data-act="p+"]',s).onclick=()=>{pi=(pi+1)%PR.length;render()};
+  $('[data-act="q-"]',s).onclick=()=>{qi=(qi+PR.length-1)%PR.length;render()};
+  $('[data-act="q+"]',s).onclick=()=>{qi=(qi+1)%PR.length;render()};
+  $('[data-act=go]',s).onclick=async()=>{
+    const my=++run, t=epoch, n=PR[pi]*PR[qi];
+    big.classList.remove('show');
+    for(let d=2,tries=1;d*d<=n;d++,tries++){
+      fact.innerHTML=`<span class="d">¿${n} ÷ ${d}?</span>`;
+      if(n%d===0){ fact.innerHTML=`<span class="g">${n} = ${d} × ${n/d}</span> <span class="d">· ${tries} intentos</span> → <span class="r">con números chicos, Oscar gana</span>`; return; }
+      await wait(60); if(my!==run||!alive(t)) return;
+    }
+  };
+  $('[data-act=real]',s).onclick=()=>{
+    run++;
+    let d=String(1+Math.random()*9|0); for(let i=1;i<617;i++) d+=Math.random()*10|0;
+    big.textContent=d; big.classList.add('show');
+    fact.innerHTML='RSA-2048: <span class="a">n tiene 617 dígitos</span> → factorizarlo: <span class="g">billones de años</span>';
+  };
+  S.rsa={enter(){ pi=PR.indexOf(61); qi=PR.indexOf(53); render(); }};
+})();
+
+/* ---- hash ---- */
+(()=>{
+  const inp=$('#hash-in'), out=$('#hash-out'), diff=$('#hash-diff'), s=$('[data-id=hash]');
+  out.innerHTML='<span></span>'.repeat(64);
+  const cells=$$('span',out); let prev='';
+  function render(){
+    const h=sha256(inp.value); let n=0;
+    cells.forEach((c,i)=>{ c.textContent=h[i]; c.classList.remove('ch');
+      if(prev&&prev[i]!==h[i]){ n++; void c.offsetWidth; c.classList.add('ch'); setTimeout(()=>c.classList.remove('ch'),120); } });
+    diff.innerHTML=prev&&prev!==h? `<span class="a">${n} de 64</span> caracteres cambiaron` : '';
+    prev=h;
+  }
+  inp.oninput=render;
+  $('[data-act=go]',s).onclick=()=>{
+    const v=inp.value; if(!v) return;
+    const last=v[v.length-1], nx=/[A-Z]/.test(last)? AB[(AB.indexOf(last)+1)%26] : (last==='z'?'a':String.fromCharCode(last.charCodeAt(0)+1));
+    inp.value=v.slice(0,-1)+nx; render();
+  };
+  S.hash={enter(){ inp.value='HOLA BOB'; prev=''; render(); }};
+})();
+
+/* ---- integridad ---- */
+S.integ={enter(s){
+  hush(s); level(s,'no puede abrir'); $('#pw-hash').textContent=sha256('clave123').slice(0,12)+'…';
+  const {a,b,o,tap}=who(s), bs=$$('.controls .btn',s); bs.forEach(x=>x.disabled=false);
+  const H=m=>'#'+sha256(m).slice(0,8);
+  async function send(evil){
+    const t=epoch; bs.forEach(x=>x.disabled=true); hush(s);
+    const msg='HOLA BOB', tag=H(msg);
+    let got=msg;
+    await travel(`<span class="pkt">${msg} <span class="hs">${tag}</span></span>`,[a,tap,b],{seg:1000,onStop:async(i,f)=>{
+      if(i===1&&evil){ o.classList.add('sniff'); got='CHAU BOB'; level(s,'modifica');
+        f.innerHTML=`<span class="pkt bad">${got} <span class="hs">${tag}</span></span>`; bubble(o,'Je, lo cambié','red'); await wait(1300); }
+    }});
+    if(!alive(t)) return;
+    const mine=H(got);
+    if(mine===tag) bubble(b,`${mine} = ${tag} ✓ intacto`,'green');
+    else bubble(b,`${mine} ≠ ${tag} ✗ ¡lo cambiaron!`,'red');
+    bs.forEach(x=>x.disabled=false);
+  }
+  $('[data-act=ok]',s).onclick=()=>send(false);
+  $('[data-act=bad]',s).onclick=()=>send(true);
+}};
+
+/* ---- post-cuántico ---- */
+S.pq={enter(s){
+  const tb=bfTable($('#bft-2')), btn=$('[data-act=go]',s), chips=$('#pq-chips');
+  tb.show(); chips.style.visibility='hidden'; chips.classList.remove('stagger'); btn.disabled=false;
+  btn.onclick=()=>{ const t=epoch; tb.quantum(); btn.disabled=true;
+    setTimeout(()=>{ if(!alive(t)) return; chips.style.visibility='visible'; chips.classList.add('stagger'); },1600); };
+}};
+
+go(Math.max(0,(parseInt(location.hash.slice(1))||1)-1));
+</script>
+</body>
+</html>

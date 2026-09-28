@@ -1,0 +1,5 @@
+# Certificado autofirmado: server.py lo genera solo si falta
+cert.pem
+key.pem
+
+__pycache__/
