@@ -9,7 +9,52 @@ se ven bytes cifrados.
 
 - Python 3
 - OpenSSL (para generar el certificado autofirmado)
-- Wireshark / tshark, con permisos de captura (usuario en el grupo `wireshark`)
+- Wireshark / tshark, con permisos de captura (ver abajo)
+
+### Permisos de captura (sin `sudo`)
+
+Wireshark y tshark no capturan directamente: delegan en `dumpcap`, que es el
+único binario que necesita privilegios. En vez de correr todo como root, se le
+dan *capabilities* a `dumpcap` y se limita su ejecución al grupo `wireshark`.
+
+1. Agregar tu usuario al grupo `wireshark` (en Arch lo crea el paquete
+   `wireshark-cli`; en Debian/Ubuntu, `sudo dpkg-reconfigure wireshark-common`
+   y responder *Sí*):
+
+   ```bash
+   sudo usermod -aG wireshark $USER
+   ```
+
+2. Verificar que `dumpcap` pertenezca al grupo y tenga las capabilities
+   (normalmente el paquete ya lo deja así):
+
+   ```bash
+   ls -l /usr/bin/dumpcap
+   # -rwxr-x--- 1 root wireshark ... /usr/bin/dumpcap
+   getcap /usr/bin/dumpcap
+   # /usr/bin/dumpcap cap_net_admin,cap_net_raw=eip
+   ```
+
+   Si faltan, aplicarlas a mano:
+
+   ```bash
+   sudo chgrp wireshark /usr/bin/dumpcap
+   sudo chmod 750 /usr/bin/dumpcap
+   sudo setcap cap_net_raw,cap_net_admin+eip /usr/bin/dumpcap
+   ```
+
+   - `cap_net_raw`: abrir sockets crudos para leer paquetes.
+   - `cap_net_admin`: poner la interfaz en modo promiscuo y configurarla.
+
+3. **Cerrar sesión y volver a entrar** (o reiniciar) para que el grupo nuevo
+   tenga efecto. Para probar sin cerrar sesión: `newgrp wireshark`.
+
+4. Comprobar:
+
+   ```bash
+   id | grep wireshark      # el grupo tiene que aparecer
+   tshark -D                # tiene que listar la interfaz "lo"
+   ```
 
 ## Presentación
 
@@ -136,7 +181,7 @@ tshark -r capturas/https.pcapng -Y 'tls.app_data && tcp.dstport == 8443' -x
 | No se captura nada | Estás en la interfaz equivocada: usá `lo`. |
 | El filtro `http` no muestra nada del 8443 | Es lo esperado: está cifrado. Usá `tls` o filtrá por puerto. |
 | `tls.record.content_type == 23` no matchea | En TLS 1.3 usá `tls.app_data`. |
-| Error de permisos al capturar | Agregá tu usuario al grupo `wireshark` y volvé a iniciar sesión. |
+| Error de permisos al capturar | Ver *Permisos de captura*: grupo `wireshark` + capabilities en `dumpcap`, y volver a iniciar sesión. |
 
 ## Conclusión
 
